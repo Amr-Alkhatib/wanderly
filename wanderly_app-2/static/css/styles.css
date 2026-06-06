@@ -53,6 +53,14 @@ body {
   display: flex;
   flex-direction: column;
 }
+a.nav-avatar {
+  text-decoration: none;
+  cursor: pointer;
+}
+a.nav-avatar:hover {
+  background: var(--orange);
+  color: #fff;
+}
 
 a { color: var(--orange); text-decoration: none; }
 main { flex: 1 0 auto; }

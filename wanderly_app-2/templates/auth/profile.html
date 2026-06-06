@@ -1,0 +1,225 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}My Account · Wanderly{% endblock %}
+
+{% block content %}
+<div class="account-page">
+  <div class="account-hero">
+    <div class="account-hero-inner">
+      <div class="account-avatar">{{ request.user.email|first|upper }}</div>
+      <div>
+        <h1 class="account-name">
+          {% if request.user.first_name %}{{ request.user.first_name }} {{ request.user.last_name }}
+          {% else %}{{ request.user.email }}{% endif %}
+        </h1>
+        <p class="account-email">{{ request.user.email }}</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="account-body">
+
+    <!-- LEFT: Profile & Preferences -->
+    <div class="account-main">
+
+      <form method="post" id="accountForm">
+        {% csrf_token %}
+
+        <!-- Personal Info -->
+        <section class="account-card">
+          <h2 class="account-section-title">Personal Information</h2>
+          <div class="account-grid-2">
+            <div class="auth-field">
+              <label class="auth-label">First name</label>
+              <input class="auth-input" type="text" name="first_name"
+                value="{{ request.user.first_name }}" placeholder="Alex" />
+            </div>
+            <div class="auth-field">
+              <label class="auth-label">Last name</label>
+              <input class="auth-input" type="text" name="last_name"
+                value="{{ request.user.last_name }}" placeholder="Müller" />
+            </div>
+          </div>
+          <div class="auth-field" style="margin-top:12px;">
+            <label class="auth-label">Email address</label>
+            <input class="auth-input" type="email" value="{{ request.user.email }}" disabled
+              style="opacity:.6;cursor:not-allowed;" />
+          </div>
+        </section>
+
+        <!-- Travel Preferences -->
+        <section class="account-card">
+          <h2 class="account-section-title">Travel Preferences</h2>
+
+          <div class="account-grid-2">
+            <div class="auth-field">
+              <label class="auth-label">Daily budget (€)</label>
+              <input class="auth-input" type="number" name="max_daily_budget_eur"
+                value="{{ profile.max_daily_budget_eur }}" min="10" max="1000" />
+            </div>
+            <div class="auth-field">
+              <label class="auth-label">Preferred travel month</label>
+              <select class="auth-input" name="travel_month">
+                <option value="">Flexible</option>
+                {% for num, name in months %}
+                  <option value="{{ num }}" {% if profile.travel_month == num %}selected{% endif %}>{{ name }}</option>
+                {% endfor %}
+              </select>
+            </div>
+          </div>
+
+          <div class="auth-field" style="margin-top:16px;">
+            <label class="auth-label">Safety priority
+              <span style="color:#6b757d;font-weight:400;">({{ profile.safety_priority }}/5)</span>
+            </label>
+            <input type="range" name="safety_priority"
+              min="1" max="5" value="{{ profile.safety_priority }}"
+              class="account-range"
+              oninput="document.getElementById('safetyVal').textContent=this.value+'/5'" />
+            <div style="display:flex;justify-content:space-between;font-size:11px;color:#6b757d;margin-top:4px;">
+              <span>Don't care</span><span>Critical</span>
+            </div>
+          </div>
+
+          <div style="margin-top:20px;">
+            <label class="auth-label" style="margin-bottom:10px;display:block;">Interests</label>
+            <div class="account-interest-grid">
+              {% for val, label in activity_categories %}
+              <label class="account-interest-chip {% if val in profile.interests %}active{% endif %}">
+                <input type="checkbox" name="interests" value="{{ val }}"
+                  {% if val in profile.interests %}checked{% endif %}
+                  onchange="this.closest('label').classList.toggle('active',this.checked)" />
+                {{ label }}
+              </label>
+              {% endfor %}
+            </div>
+          </div>
+        </section>
+
+        <button type="submit" class="auth-btn" style="max-width:220px;">
+          <span class="btn-label">Save preferences</span>
+        </button>
+      </form>
+
+    </div>
+
+    <!-- RIGHT: Saved Trips & Actions -->
+    <div class="account-sidebar">
+
+      <section class="account-card">
+        <h2 class="account-section-title">Saved Trips</h2>
+        {% if saved_trips %}
+          <ul class="account-saved-list">
+            {% for trip in saved_trips %}
+            <li class="account-saved-item">
+              <a href="{% url 'destination' trip.city.slug %}" class="account-saved-link">
+                <span class="account-saved-name">{{ trip.city.name }}</span>
+                <span class="account-saved-country">{{ trip.city.country.name }}</span>
+              </a>
+              {% if trip.score_at_save %}
+              <span class="account-saved-score">{{ trip.score_at_save }}</span>
+              {% endif %}
+            </li>
+            {% endfor %}
+          </ul>
+        {% else %}
+          <p style="color:#6b757d;font-size:14px;">No saved trips yet. Explore destinations and save the ones you love!</p>
+          <a href="{% url 'home' %}" class="auth-btn" style="display:flex;text-decoration:none;margin-top:16px;max-width:180px;">
+            <span class="btn-label">Discover now →</span>
+          </a>
+        {% endif %}
+      </section>
+
+      <section class="account-card" style="margin-top:16px;">
+        <h2 class="account-section-title">Account</h2>
+        <a href="{% url 'password_reset' %}" class="account-action-link">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+          Change password
+        </a>
+        <a href="{% url 'logout' %}" class="account-action-link" style="color:#dc2626;">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+          Sign out
+        </a>
+      </section>
+
+    </div>
+  </div>
+</div>
+
+<style>
+.account-page { max-width: 1100px; margin: 0 auto; padding: 0 40px 48px; }
+
+.account-hero {
+  background: var(--navy);
+  border-radius: 0 0 16px 16px;
+  padding: 32px 40px;
+  margin: 0 -40px 32px;
+}
+.account-hero-inner { display: flex; align-items: center; gap: 20px; }
+.account-avatar {
+  width: 64px; height: 64px; border-radius: 50%;
+  background: var(--orange); color: #fff;
+  font-size: 26px; font-weight: 700;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+}
+.account-name { color: #fff; font-size: 22px; font-weight: 700; margin-bottom: 4px; }
+.account-email { color: var(--text-muted); font-size: 14px; }
+
+.account-body { display: grid; grid-template-columns: 1fr 340px; gap: 24px; align-items: start; }
+@media (max-width: 768px) { .account-body { grid-template-columns: 1fr; } }
+
+.account-card {
+  background: #fff; border-radius: var(--radius);
+  padding: 24px; box-shadow: var(--shadow);
+  margin-bottom: 20px;
+}
+.account-section-title { font-size: 16px; font-weight: 700; color: var(--navy); margin-bottom: 18px; }
+.account-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+@media (max-width: 500px) { .account-grid-2 { grid-template-columns: 1fr; } }
+
+.account-range {
+  width: 100%; accent-color: var(--orange);
+  height: 4px; cursor: pointer;
+}
+
+.account-interest-grid { display: flex; flex-wrap: wrap; gap: 8px; }
+.account-interest-chip {
+  padding: 6px 14px; border-radius: 20px;
+  border: 1.5px solid var(--border-light);
+  font-size: 13px; font-weight: 500; cursor: pointer;
+  color: #4b5563; transition: all .15s;
+  user-select: none;
+}
+.account-interest-chip input { display: none; }
+.account-interest-chip.active {
+  background: var(--pill-bg); color: var(--orange);
+  border-color: var(--orange);
+}
+.account-interest-chip:hover { border-color: var(--orange); }
+
+.account-saved-list { list-style: none; display: flex; flex-direction: column; gap: 8px; }
+.account-saved-item {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 10px 12px; border-radius: 8px;
+  background: var(--page-bg);
+}
+.account-saved-link { display: flex; flex-direction: column; gap: 2px; text-decoration: none; }
+.account-saved-name { font-weight: 600; font-size: 14px; color: var(--navy); }
+.account-saved-country { font-size: 12px; color: #6b757d; }
+.account-saved-score {
+  background: var(--score-bg); color: var(--score-fg);
+  font-weight: 700; font-size: 14px;
+  padding: 4px 8px; border-radius: 6px;
+}
+.account-action-link {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 0; font-size: 14px; font-weight: 500;
+  color: var(--navy); text-decoration: none;
+  border-bottom: 1px solid var(--border-light);
+}
+.account-action-link:last-child { border-bottom: none; }
+.account-action-link:hover { color: var(--orange); }
+</style>
+{% endblock %}
