@@ -75,4 +75,4 @@ def account(request: HttpRequest) -> HttpResponse:
             (9,"September"),(10,"October"),(11,"November"),(12,"December"),
         ],
     }
-    return render(request, "auth/account.html", context)
+    return render(request, "auth/profile.html", context)
