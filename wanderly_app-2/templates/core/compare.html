@@ -1,0 +1,100 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Compare Destinations · Wanderly{% endblock %}
+
+{% block content %}
+<div class="page cmp-page">
+
+  <div class="cmp-head">
+    <a href="{% url 'home' %}" class="cmp-back" aria-label="Back">←</a>
+    <h1 class="cmp-title">Compare Destinations</h1>
+    <a href="#cmp-picker" class="cmp-add-btn">+ Add destination</a>
+  </div>
+
+  {% if comparison %}
+    {% with cols=comparison.scored|length %}
+    <div class="cmp-table" style="--cols: {{ cols }};">
+
+      <!-- Column headers -->
+      <div class="cmp-col-headers">
+        {% for sc in comparison.scored %}
+        <div class="cmp-col-head {% cycle 'ch-a' 'ch-b' 'ch-c' %}">
+          <div class="cmp-col-country">{{ sc.city.country.name }}</div>
+          <div class="cmp-col-city">{{ sc.city.name }} · {{ sc.city.country.get_region_display }}</div>
+        </div>
+        {% endfor %}
+        {% for _ in open_slots %}
+        <a href="#cmp-picker" class="cmp-col-add">+ Add country</a>
+        {% endfor %}
+      </div>
+
+      <!-- Header bar -->
+      <div class="cmp-row cmp-row-header">
+        <span class="cmp-cat">Category</span>
+        {% for sc in comparison.scored %}
+          <span class="cmp-hcell">{{ sc.city.country.name }}</span>
+        {% endfor %}
+      </div>
+
+      <!-- Data rows -->
+      {% for row in comparison.rows %}
+      <div class="cmp-row {% cycle 'rw-white' 'rw-cream' %}">
+        <span class="cmp-cat">{{ row.label }}</span>
+        {% for cell in row.cells %}
+          <span class="cmp-cell
+                       {% if cell.is_winner %}cell-win{% elif row.better != 'none' %}cell-alt{% else %}cell-plain{% endif %}">
+            <span class="cmp-cell-val">{{ cell.display }}</span>
+            {% if cell.is_estimated %}<span class="cmp-est" title="Estimated — not yet backed by verified data">est.</span>{% endif %}
+          </span>
+        {% endfor %}
+      </div>
+      {% endfor %}
+
+      <!-- Verdict card -->
+      {% if comparison.verdicts %}
+      <div class="cmp-verdict">
+        <div class="cmp-verdict-grid">
+          {% for label, winner in comparison.verdicts %}
+          <div class="cmp-verdict-item {% if 'Overall' in label %}cmp-verdict-strong{% endif %}">
+            <span class="cmp-verdict-label">{{ label }}:</span>
+            <span class="cmp-verdict-winner">{{ winner }}</span>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+      {% endif %}
+
+    </div>
+    {% endwith %}
+  {% else %}
+    <div class="cmp-empty">
+      <div class="cmp-empty-icon">⚖️</div>
+      <p>Pick two or three destinations below to see them side by side.</p>
+    </div>
+  {% endif %}
+
+  <!-- Picker -->
+  <form method="get" class="cmp-picker" id="cmp-picker">
+    <h3>{% if comparison %}Change selection{% else %}Choose destinations{% endif %}</h3>
+    <div class="cmp-picker-row">
+      {% for slug in picker_slots %}
+      <div class="cmp-picker-field">
+        <label>Destination {{ forloop.counter }}</label>
+        <select name="city">
+          <option value="">— choose —</option>
+          {% for c in all_cities %}
+            <option value="{{ c.slug }}"
+              {% if c.slug == slug %}selected{% endif %}>
+              {{ c.country.name }} — {{ c.name }}
+            </option>
+          {% endfor %}
+        </select>
+      </div>
+      {% endfor %}
+      <button type="submit" class="cmp-compare-btn">Compare →</button>
+    </div>
+  </form>
+
+</div>
+{% endblock %}

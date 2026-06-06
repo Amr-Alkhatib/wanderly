@@ -1,0 +1,16 @@
+# Core framework
+Django==5.1.4
+asgiref==3.8.1
+sqlparse==0.5.3
+
+# PostgreSQL driver (production DB; SQLite needs no driver for local dev)
+psycopg[binary]==3.2.3
+
+# Production WSGI server + static file serving
+gunicorn==23.0.0
+whitenoise==6.8.2
+
+# --- Planned next-step dependencies (left commented until wired in) ---
+# praw==7.8.1            # Reddit ingestion (ReviewSource)
+# transformers==4.46.0  # ABSA model inference
+# torch                 # transformers backend

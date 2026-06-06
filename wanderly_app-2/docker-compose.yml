@@ -1,0 +1,35 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: wanderly
+      POSTGRES_USER: wanderly
+      POSTGRES_PASSWORD: wanderly
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U wanderly"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  web:
+    build: .
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DJANGO_DEBUG: "0"
+      DJANGO_SECRET_KEY: "change-me-in-real-deployments"
+      DJANGO_ALLOWED_HOSTS: "localhost,127.0.0.1"
+      DJANGO_DB_ENGINE: "postgresql"
+      DJANGO_DB_NAME: "wanderly"
+      DJANGO_DB_USER: "wanderly"
+      DJANGO_DB_PASSWORD: "wanderly"
+      DJANGO_DB_HOST: "db"
+      DJANGO_DB_PORT: "5432"
+    ports:
+      - "8000:8000"
+
+volumes:
+  pgdata:

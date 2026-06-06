@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Explore Destinations · Wanderly{% endblock %}
+
+{% block content %}
+<div class="container" style="padding-top: 32px;">
+
+  <h1 style="font-size: 26px; font-weight: 800; margin-bottom: 24px;">Explore Destinations</h1>
+
+  <!-- Filters (GET so results are shareable/bookmarkable) -->
+  <form method="get" class="filters-bar">
+    <div class="filter-group" style="flex: 2; min-width: 200px;">
+      <label>Search</label>
+      <div class="search-bar" style="max-width: none; border-radius: 6px;">
+        <input type="text" name="q" value="{{ selected.q }}" placeholder="Country or city…" />
+      </div>
+    </div>
+    <div class="filter-group">
+      <label>Region</label>
+      <select name="region">
+        <option value="">All regions</option>
+        {% for value, label in regions %}
+          <option value="{{ value }}" {% if selected.region == value %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="filter-group">
+      <label>Budget</label>
+      <select name="budget">
+        <option value="">Any budget</option>
+        {% for value, label in budget_tiers %}
+          <option value="{{ value }}" {% if selected.budget == value|stringformat:'s' %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="filter-group">
+      <label>Category</label>
+      <select name="category">
+        <option value="">All types</option>
+        {% for value, label in categories %}
+          <option value="{{ value }}" {% if selected.category == value %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <button class="btn-primary" type="submit">Filter</button>
+  </form>
+
+  <div class="results-meta">{{ result_count }} destination{{ result_count|pluralize }} found</div>
+
+  <div class="search-grid">
+    {% for sc in results %}
+    <a class="dest-card" href="{% url 'destination' sc.city.slug %}">
+      <div class="dest-card-img-placeholder">{{ sc.city.emoji }}</div>
+      <div class="dest-card-body">
+        <div class="dest-card-name">{{ sc.city.name }}</div>
+        <div class="dest-card-meta">
+          {{ sc.city.country.get_region_display }} · {{ sc.city.budget_symbol }}
+        </div>
+        <div class="dest-card-footer">
+          <span class="score-badge">{{ sc.score }}/100</span>
+          <span class="tag-pill tag-cultural">{{ sc.city.get_primary_category_display }}</span>
+        </div>
+      </div>
+    </a>
+    {% empty %}
+      <p style="color:#6B8A99;">No destinations match those filters.</p>
+    {% endfor %}
+  </div>
+</div>
+{% endblock %}

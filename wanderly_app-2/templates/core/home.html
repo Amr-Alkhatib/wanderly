@@ -1,0 +1,120 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Wanderly — Where will you go next?{% endblock %}
+
+{% block content %}
+
+<!-- ===== Hero ===== -->
+<section class="hero">
+  <div class="hero-inner">
+    <div class="hero-logo">
+      <img src="{% static 'images/dest/wanderly-hero.png' %}" alt="Wanderly"
+           onerror="this.style.display='none'" />
+    </div>
+    <div class="hero-copy">
+      <h1>Where will you go next?</h1>
+      <p class="hero-sub">Data-driven destination discovery — no social media noise</p>
+
+      <form class="hero-search" action="{% url 'search' %}" method="get" role="search">
+        <input type="text" name="q" placeholder="Search country or city..."
+               aria-label="Search country or city" />
+        <button type="submit">Search</button>
+      </form>
+
+      <div class="hero-pills">
+        {% for sc in suggestion_pills|slice:":6" %}
+          <a class="hero-pill" href="{% url 'destination' sc.city.slug %}">{{ sc.city.name }}</a>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+</section>
+
+<div class="page">
+
+  <!-- ===== Featured Destinations ===== -->
+  <section class="section">
+    <div class="section-head">
+      <h2 class="section-title">Featured Destinations</h2>
+      <a class="view-all" href="{% url 'search' %}">View all →</a>
+    </div>
+
+    <div class="featured-grid">
+      {% for sc in featured %}
+      <a class="dest-card" href="{% url 'destination' sc.city.slug %}">
+        <div class="dest-card-img">
+          <img src="{% static 'images/dest/' %}{{ sc.city.image_file }}"
+               alt="{{ sc.city.country.name }}"
+               onerror="this.parentNode.classList.add('img-fallback');this.remove();" />
+          <span class="img-fallback-glyph">{{ sc.city.emoji }}</span>
+        </div>
+        <div class="dest-card-body">
+          <div class="dest-card-name">{{ sc.city.country.name }}</div>
+          <div class="dest-card-meta">
+            {{ sc.city.country.get_region_display }}{% if sc.city.safety_label %} · {{ sc.city.safety_label }}{% endif %} · {{ sc.city.budget_symbol }}
+          </div>
+          <div class="dest-card-tags">
+            <span class="score-badge" title="{{ sc.explain }}">{{ sc.score }}/100 <span class="score-info">ⓘ</span></span>
+            {% if sc.city.card_pill %}
+              <span class="pill pill-soft">{{ sc.city.card_pill }}</span>
+            {% endif %}
+            {% if sc.city.get_primary_category_display != sc.city.card_pill %}
+              <span class="pill pill-soft">{{ sc.city.get_primary_category_display }}</span>
+            {% endif %}
+          </div>
+        </div>
+      </a>
+      {% empty %}
+        <p class="empty-note">No featured destinations yet. Run
+          <code>python manage.py seed_demo</code> to populate the demo data.</p>
+      {% endfor %}
+    </div>
+  </section>
+
+  <!-- ===== Top Picks + Plan by Category ===== -->
+  <div class="discover-cols">
+
+    <section class="col-main">
+      <h2 class="section-title">Top Picks This Month</h2>
+      <div class="picks-list">
+        {% for sc in top_picks %}
+        <a class="pick-row" href="{% url 'destination' sc.city.slug %}">
+          <span class="pick-thumb">
+            <img src="{% static 'images/dest/' %}{{ sc.city.image_file }}"
+                 alt="{{ sc.city.country.name }}"
+                 onerror="this.parentNode.classList.add('img-fallback');this.remove();" />
+            <span class="img-fallback-glyph">{{ sc.city.emoji }}</span>
+          </span>
+          <span class="pick-info">
+            <span class="pick-name">{{ sc.city.country.name }}</span>
+            <span class="pick-meta">
+              {% with cost=sc.city.cost_snapshots.first %}{% if cost %}${{ cost.daily_budget_eur }}/day · {% endif %}{% endwith %}{{ sc.city.safety_label }}
+            </span>
+          </span>
+          <span class="pick-score" title="{{ sc.explain }}">→</span>
+        </a>
+        {% endfor %}
+      </div>
+    </section>
+
+    <section class="col-side">
+      <h2 class="section-title">Plan by Category</h2>
+      <div class="category-grid">
+        {% for label, value, color in category_tiles %}
+          <a class="category-tile" style="background:{{ color }};"
+             href="{% url 'search' %}?category={{ value }}">{{ label }}</a>
+        {% endfor %}
+      </div>
+
+      <div class="ai-card">
+        <div class="ai-card-label">✦ Wanderly AI Advisor</div>
+        <p>Every score comes with a transparent, per-factor breakdown —
+           we always explain <em>why</em>, not just <em>what</em>.</p>
+        <a href="{% url 'search' %}" class="ai-card-btn">Find my match →</a>
+      </div>
+    </section>
+
+  </div>
+</div>
+{% endblock %}

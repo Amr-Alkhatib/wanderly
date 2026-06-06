@@ -1,0 +1,49 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>{% block title %}Wanderly — Discover More. Travel Deeper.{% endblock %}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="stylesheet" href="{% static 'css/styles.css' %}" />
+</head>
+<body>
+
+<nav class="navbar">
+  <div class="nav-inner">
+    <a href="{% url 'home' %}" class="brand">
+      <span class="brand-mark" aria-hidden="true"></span>
+      <span class="brand-word">Wanderly</span>
+    </a>
+
+    <ul class="nav-links">
+      <li><a href="{% url 'home' %}" {% if request.resolver_match.url_name == 'home' %}class="active"{% endif %}>Discover</a></li>
+      <li><a href="{% url 'compare' %}" {% if request.resolver_match.url_name == 'compare' %}class="active"{% endif %}>Compare</a></li>
+      <li><a href="#">Trips</a></li>
+      <li><a href="#">Saved</a></li>
+    </ul>
+
+    <form class="nav-search" action="{% url 'search' %}" method="get" role="search">
+      <input type="text" name="q" placeholder="Search destinations..." aria-label="Search destinations" />
+    </form>
+
+    <a href="{% url 'search' %}" class="nav-cta">Plan a Trip</a>
+    <span class="nav-avatar" aria-hidden="true">L</span>
+  </div>
+</nav>
+
+<main>
+  {% block content %}{% endblock %}
+</main>
+
+<footer class="footer">
+  <div class="footer-inner">
+    <span class="footer-brand">wanderly</span>
+    <span class="footer-tag">Discover More. Travel Deeper.</span>
+    <span class="footer-meta">© 2026 Wanderly · TUM Project Work</span>
+  </div>
+</footer>
+
+</body>
+</html>
