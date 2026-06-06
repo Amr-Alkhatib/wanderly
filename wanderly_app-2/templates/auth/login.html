@@ -1,0 +1,115 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Sign In · Wanderly{% endblock %}
+
+{% block content %}
+<div class="auth-page">
+  <div class="auth-card">
+
+    <div class="auth-brand">
+      <span class="auth-brand-mark"></span>
+      <span class="auth-brand-word">Wanderly</span>
+    </div>
+
+    <h1 class="auth-title">Welcome back</h1>
+    <p class="auth-subtitle">Sign in to your account to continue exploring</p>
+
+    {% if form.non_field_errors %}
+    <div class="auth-errors" role="alert">
+      {% for error in form.non_field_errors %}{{ error }}{% endfor %}
+    </div>
+    {% endif %}
+
+    <form method="post" id="loginForm" novalidate>
+      {% csrf_token %}
+      <input type="hidden" name="next" value="{{ next }}" />
+
+      <div class="auth-field">
+        <label class="auth-label" for="{{ form.username.id_for_label }}">Email or username</label>
+        <div class="auth-input-wrap">
+          <input
+            class="auth-input {% if form.username.errors %}error{% endif %}"
+            type="text"
+            id="{{ form.username.id_for_label }}"
+            name="{{ form.username.html_name }}"
+            value="{{ form.username.value|default:'' }}"
+            autocomplete="username"
+            autofocus
+            placeholder="you@example.com"
+          />
+        </div>
+        {% for error in form.username.errors %}
+          <span class="field-error">
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><circle cx="6" cy="6" r="5.5" stroke="#dc2626"/><path d="M6 4v3M6 8.5v.5" stroke="#dc2626" stroke-linecap="round"/></svg>
+            {{ error }}
+          </span>
+        {% endfor %}
+      </div>
+
+      <div class="auth-field">
+        <label class="auth-label" for="{{ form.password.id_for_label }}">Password</label>
+        <div class="auth-input-wrap">
+          <input
+            class="auth-input {% if form.password.errors %}error{% endif %}"
+            type="password"
+            id="{{ form.password.id_for_label }}"
+            name="{{ form.password.html_name }}"
+            autocomplete="current-password"
+            placeholder="••••••••"
+          />
+          <button type="button" class="pw-toggle" aria-label="Toggle password visibility" onclick="togglePw('{{ form.password.id_for_label }}', this)">
+            <svg class="eye-show" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+            <svg class="eye-hide" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display:none"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+          </button>
+        </div>
+        {% for error in form.password.errors %}
+          <span class="field-error">
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><circle cx="6" cy="6" r="5.5" stroke="#dc2626"/><path d="M6 4v3M6 8.5v.5" stroke="#dc2626" stroke-linecap="round"/></svg>
+            {{ error }}
+          </span>
+        {% endfor %}
+      </div>
+
+      <div class="auth-forgot">
+        <a href="{% url 'password_reset' %}">Forgot password?</a>
+      </div>
+
+      <button type="submit" class="auth-btn" id="loginBtn">
+        <span class="spinner"></span>
+        <span class="btn-label">Sign in</span>
+      </button>
+    </form>
+
+    <div class="auth-footer">
+      Don't have an account? <a href="{% url 'signup' %}">Create one →</a>
+    </div>
+
+  </div>
+</div>
+
+<script>
+function togglePw(fieldId, btn) {
+  const inp = document.getElementById(fieldId);
+  const show = btn.querySelector('.eye-show');
+  const hide = btn.querySelector('.eye-hide');
+  if (inp.type === 'password') {
+    inp.type = 'text';
+    show.style.display = 'none';
+    hide.style.display = 'block';
+    btn.setAttribute('aria-label', 'Hide password');
+  } else {
+    inp.type = 'password';
+    show.style.display = 'block';
+    hide.style.display = 'none';
+    btn.setAttribute('aria-label', 'Show password');
+  }
+}
+
+document.getElementById('loginForm').addEventListener('submit', function() {
+  const btn = document.getElementById('loginBtn');
+  btn.classList.add('loading');
+  btn.disabled = true;
+});
+</script>
+{% endblock %}

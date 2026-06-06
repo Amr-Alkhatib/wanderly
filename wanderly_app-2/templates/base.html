@@ -7,6 +7,8 @@
   <title>{% block title %}Wanderly — Discover More. Travel Deeper.{% endblock %}</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="stylesheet" href="{% static 'css/styles.css' %}" />
+  <link rel="icon" type="image/png" href="{% static 'images/favicon.png' %}" />
+<link rel="stylesheet" href="{% static 'css/auth.css' %}" />
 </head>
 <body>
 
@@ -29,7 +31,12 @@
     </form>
 
     <a href="{% url 'search' %}" class="nav-cta">Plan a Trip</a>
-    <span class="nav-avatar" aria-hidden="true">L</span>
+    {% if user.is_authenticated %}
+  <span class="nav-avatar" title="{{ user.email }}">{{ user.email|first|upper }}</span>
+  <a href="{% url 'logout' %}" style="color:var(--text-muted);font-size:13px;margin-left:8px;">Logout</a>
+{% else %}
+  <a href="{% url 'login' %}" class="nav-cta" style="margin-left:8px;">Log in</a>
+{% endif %}
   </div>
 </nav>
 

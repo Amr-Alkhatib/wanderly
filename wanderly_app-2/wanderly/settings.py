@@ -67,6 +67,7 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
+    "accounts.apps.AccountsConfig",
     # Wanderly apps -- ordered by dependency (data first, intelligence next).
     "destinations.apps.DestinationsConfig",
     "intelligence.apps.IntelligenceConfig",
@@ -179,7 +180,24 @@ STORAGES = {
 }
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+AUTH_USER_MODEL = "accounts.User"
+LOGIN_URL = "login"
+LOGIN_REDIRECT_URL = "home"
+LOGIN_URL = "/accounts/login/"
+LOGIN_REDIRECT_URL = "/"
+LOGOUT_REDIRECT_URL = "/"
 
+# Dev: print emails to console
+EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
+
+# Production SMTP (set via environment):
+# EMAIL_BACKEND    = "django.core.mail.backends.smtp.EmailBackend"
+# EMAIL_HOST       = os.environ.get("EMAIL_HOST")
+# EMAIL_PORT       = int(os.environ.get("EMAIL_PORT", 587))
+# EMAIL_USE_TLS    = True
+# EMAIL_HOST_USER  = os.environ.get("EMAIL_HOST_USER")
+# EMAIL_HOST_PASSWORD = os.environ.get("EMAIL_HOST_PASSWORD")
+# DEFAULT_FROM_EMAIL  = "Wanderly <noreply@wanderly.app>"
 
 # --- Production hardening (only switched on when DEBUG is False) -------------
 #
@@ -196,6 +214,7 @@ if not DEBUG:
     SECURE_CONTENT_TYPE_NOSNIFF = True
     # Trust the X-Forwarded-Proto header from a TLS-terminating proxy.
     SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+
 
 
 # --- Wanderly: LLM Explainer configuration -----------------------------------
