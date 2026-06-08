@@ -1,0 +1,1165 @@
+From b1c9392ea02d4cb93d3e419f66d39ccb12616728 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Mon, 8 Jun 2026 16:54:20 +0000
+Subject: [PATCH] Integrate Supabase Auth + trips; add saved page
+
+- Auth: signup/login now call Supabase Auth (sign_up / sign_in_with_password)
+  and create a linked Django User (supabase_uid field) for session continuity
+- Backend: service-role Supabase client (wanderly/supabase_client.py) for all
+  data operations; secret key stays env-only, never sent to frontend
+- Trip API: POST /api/trips/save|unsave|complete endpoints (CSRF + session auth)
+- Saved page: GET /saved/ renders trips from Supabase enriched with Django City
+  objects (image, emoji, country); tab filtering (All / Saved / Completed)
+- Save buttons: added bookmark icon buttons on home + search destination cards;
+  AJAX save with visual feedback; redirects to login when unauthenticated
+- Supabase profile sync on account page (Profiles table upsert)
+- Migration: accounts.0002 adds User.supabase_uid unique char field
+- Supabase DDL: trips.title column added via apply_migration
+
+https://claude.ai/code/session_01WURJeHHRNh7LmMmqnM7uPk
+---
+ .../migrations/0002_user_supabase_uid.py      |  22 ++
+ wanderly_app-2/accounts/models.py             |   7 +
+ wanderly_app-2/requirements.txt               |   3 +
+ wanderly_app-2/static/css/styles.css          | 238 +++++++++++++++++-
+ wanderly_app-2/templates/base.html            |   2 +-
+ wanderly_app-2/templates/core/home.html       |  86 +++++--
+ wanderly_app-2/templates/core/saved.html      | 148 +++++++++++
+ wanderly_app-2/templates/core/search.html     |  65 ++++-
+ wanderly_app-2/wanderly/settings.py           |  13 +
+ wanderly_app-2/wanderly/supabase_client.py    |  20 ++
+ wanderly_app-2/wanderly/urls.py               |   7 +-
+ wanderly_app-2/web/urls.py                    |   2 +
+ wanderly_app-2/web/views_auth.py              | 145 +++++++++--
+ wanderly_app-2/web/views_saved.py             |  35 +++
+ wanderly_app-2/web/views_trips.py             | 107 ++++++++
+ 15 files changed, 843 insertions(+), 57 deletions(-)
+ create mode 100644 wanderly_app-2/accounts/migrations/0002_user_supabase_uid.py
+ create mode 100644 wanderly_app-2/templates/core/saved.html
+ create mode 100644 wanderly_app-2/wanderly/supabase_client.py
+ create mode 100644 wanderly_app-2/web/views_saved.py
+ create mode 100644 wanderly_app-2/web/views_trips.py
+
+diff --git a/wanderly_app-2/accounts/migrations/0002_user_supabase_uid.py b/wanderly_app-2/accounts/migrations/0002_user_supabase_uid.py
+new file mode 100644
+index 0000000..bbd7780
+--- /dev/null
++++ b/wanderly_app-2/accounts/migrations/0002_user_supabase_uid.py
+@@ -0,0 +1,22 @@
++from django.db import migrations, models
++
++
++class Migration(migrations.Migration):
++
++    dependencies = [
++        ("accounts", "0001_initial"),
++    ]
++
++    operations = [
++        migrations.AddField(
++            model_name="user",
++            name="supabase_uid",
++            field=models.CharField(
++                blank=True,
++                help_text="Supabase auth.users UUID, set on first Supabase sign-in/sign-up.",
++                max_length=64,
++                null=True,
++                unique=True,
++            ),
++        ),
++    ]
+diff --git a/wanderly_app-2/accounts/models.py b/wanderly_app-2/accounts/models.py
+index ef91e79..0e90dec 100644
+--- a/wanderly_app-2/accounts/models.py
++++ b/wanderly_app-2/accounts/models.py
+@@ -23,6 +23,13 @@ class UserManager(BaseUserManager):
+ class User(AbstractUser):
+     username = None
+     email = models.EmailField(unique=True)
++    supabase_uid = models.CharField(
++        max_length=64,
++        null=True,
++        blank=True,
++        unique=True,
++        help_text="Supabase auth.users UUID, set on first Supabase sign-in/sign-up.",
++    )
+ 
+     USERNAME_FIELD = "email"
+     REQUIRED_FIELDS: list[str] = []
+diff --git a/wanderly_app-2/requirements.txt b/wanderly_app-2/requirements.txt
+index 71686e1..657ccea 100644
+--- a/wanderly_app-2/requirements.txt
++++ b/wanderly_app-2/requirements.txt
+@@ -10,6 +10,9 @@ psycopg[binary]==3.2.3
+ gunicorn==23.0.0
+ whitenoise==6.8.2
+ 
++# Supabase integration
++supabase>=2.10.0
++
+ # --- Planned next-step dependencies (left commented until wired in) ---
+ # praw==7.8.1            # Reddit ingestion (ReviewSource)
+ # transformers==4.46.0  # ABSA model inference
+diff --git a/wanderly_app-2/static/css/styles.css b/wanderly_app-2/static/css/styles.css
+index 43a8fb9..9951131 100644
+--- a/wanderly_app-2/static/css/styles.css
++++ b/wanderly_app-2/static/css/styles.css
+@@ -728,11 +728,247 @@ main { flex: 1 0 auto; }
+ /* retain the legacy compare-table styles for any other reference */
+ .compare-selector { background: var(--white); border: 1px solid var(--border-light); border-radius: var(--radius); padding: 24px; margin-bottom: 28px; }
+ 
++/* ==================== DESTINATION CARD WRAPPER (save btn) ==================== */
++.dest-card-wrap {
++  position: relative;
++  display: block;
++}
++.dest-card-wrap .dest-card {
++  display: block;
++  width: 100%;
++  height: 100%;
++}
++
++/* Save / bookmark button on destination cards */
++.trip-save-btn {
++  position: absolute;
++  top: 10px;
++  right: 10px;
++  z-index: 2;
++  width: 34px;
++  height: 34px;
++  border-radius: 50%;
++  border: none;
++  background: rgba(255,255,255,0.92);
++  color: var(--muted);
++  cursor: pointer;
++  display: flex;
++  align-items: center;
++  justify-content: center;
++  box-shadow: 0 2px 8px rgba(0,0,0,0.15);
++  transition: background .15s, color .15s, transform .12s;
++}
++.trip-save-btn:hover {
++  background: var(--white);
++  color: var(--orange);
++  transform: scale(1.08);
++}
++.trip-save-btn.saved {
++  background: var(--orange);
++  color: var(--white);
++}
++.trip-save-btn.saving {
++  opacity: 0.6;
++  pointer-events: none;
++}
++
++/* ========================== SAVED PAGE ============================ */
++.saved-header {
++  margin-bottom: 28px;
++}
++.saved-title {
++  font-size: 32px;
++  font-weight: 800;
++  color: var(--ink);
++}
++.saved-subtitle {
++  color: var(--muted);
++  font-size: 15px;
++  margin-top: 4px;
++}
++
++/* Tabs */
++.saved-tabs {
++  display: flex;
++  gap: 8px;
++  margin-bottom: 24px;
++  border-bottom: 1px solid var(--border-light);
++  padding-bottom: 12px;
++}
++.saved-tab {
++  padding: 6px 18px;
++  border-radius: 8px;
++  border: 1.5px solid transparent;
++  background: transparent;
++  color: var(--muted);
++  font-size: 14px;
++  font-weight: 500;
++  cursor: pointer;
++  font-family: var(--font);
++  transition: all .15s;
++}
++.saved-tab:hover { color: var(--ink); background: rgba(0,0,0,0.04); }
++.saved-tab.active { background: var(--navy); color: var(--white); }
++.tab-count {
++  display: inline-block;
++  background: var(--orange);
++  color: var(--white);
++  font-size: 11px;
++  font-weight: 700;
++  border-radius: 10px;
++  padding: 0 6px;
++  margin-left: 4px;
++  line-height: 18px;
++}
++
++/* Saved trip grid */
++.saved-grid {
++  display: grid;
++  grid-template-columns: repeat(3, 1fr);
++  gap: 20px;
++}
++
++/* Saved trip card */
++.saved-card {
++  background: var(--white);
++  border-radius: var(--radius);
++  box-shadow: var(--shadow);
++  overflow: hidden;
++  display: flex;
++  flex-direction: column;
++  transition: transform .15s, box-shadow .15s;
++}
++.saved-card:hover {
++  transform: translateY(-2px);
++  box-shadow: 0 10px 24px rgba(0,0,0,0.11);
++}
++.saved-card-img {
++  position: relative;
++  height: 160px;
++  background: linear-gradient(135deg, var(--navy-2), var(--navy));
++  overflow: hidden;
++}
++.saved-card-img img {
++  width: 100%; height: 100%;
++  object-fit: cover; display: block;
++}
++.saved-card-img .img-fallback-glyph { display: flex; font-size: 3rem; }
++
++/* Status badge overlaid on card image */
++.saved-status-badge {
++  position: absolute;
++  top: 10px;
++  left: 10px;
++  font-size: 11px;
++  font-weight: 600;
++  padding: 4px 10px;
++  border-radius: 100px;
++}
++.saved-status-saved   { background: var(--pill-bg); color: var(--pill-fg); }
++.saved-status-completed { background: var(--score-bg); color: var(--score-fg); }
++
++/* Bookmark button inside saved card */
++.saved-bookmark-btn {
++  position: absolute;
++  top: 10px;
++  right: 10px;
++  width: 32px;
++  height: 32px;
++  border-radius: 50%;
++  border: none;
++  background: rgba(255,255,255,0.9);
++  color: var(--orange);
++  display: flex;
++  align-items: center;
++  justify-content: center;
++  cursor: pointer;
++  transition: background .15s, transform .12s;
++}
++.saved-bookmark-btn:hover {
++  background: var(--white);
++  transform: scale(1.1);
++}
++
++/* Card body */
++.saved-card-body {
++  padding: 16px 18px 18px;
++  display: flex;
++  flex-direction: column;
++  gap: 6px;
++  flex: 1;
++}
++.saved-card-name  { font-size: 18px; font-weight: 700; color: var(--ink); }
++.saved-card-meta  { font-size: 13px; color: var(--muted); }
++.saved-card-dates { font-size: 12px; color: var(--muted); }
++.saved-card-notes {
++  font-size: 13px;
++  color: var(--muted);
++  line-height: 1.4;
++  margin-top: 4px;
++}
++
++/* Actions row */
++.saved-card-actions {
++  display: flex;
++  align-items: center;
++  gap: 10px;
++  margin-top: auto;
++  padding-top: 12px;
++}
++.saved-btn-view {
++  font-size: 13px;
++  font-weight: 600;
++  color: var(--orange);
++  text-decoration: none;
++  margin-right: auto;
++}
++.saved-btn-view:hover { color: var(--orange-deep); }
++.saved-btn-complete {
++  font-size: 12px;
++  font-weight: 500;
++  padding: 5px 12px;
++  border-radius: 7px;
++  border: 1.5px solid var(--score-fg);
++  background: transparent;
++  color: var(--score-fg);
++  cursor: pointer;
++  font-family: var(--font);
++  transition: background .15s, color .15s;
++}
++.saved-btn-complete:hover {
++  background: var(--score-bg);
++}
++
++/* Empty state */
++.saved-empty {
++  text-align: center;
++  padding: 80px 20px;
++  color: var(--muted);
++}
++.saved-empty-icon { font-size: 56px; margin-bottom: 16px; }
++.saved-empty-title { font-size: 22px; font-weight: 700; color: var(--ink); margin-bottom: 8px; }
++.saved-empty-sub   { font-size: 15px; max-width: 400px; margin: 0 auto 24px; }
++.saved-discover-btn {
++  display: inline-flex;
++  align-items: center;
++  height: 44px;
++  padding: 0 24px;
++  background: var(--orange);
++  color: var(--white);
++  font-weight: 600;
++  font-size: 14px;
++  border-radius: 10px;
++  text-decoration: none;
++  transition: background .15s;
++}
++.saved-discover-btn:hover { background: var(--orange-deep); color: var(--white); }
++
+ /* ============================ RESPONSIVE ============================ */
+ @media (max-width: 1100px) {
+   :root { --gutter: 40px; }
+   .discover-cols { grid-template-columns: 1fr; }
+   .featured-grid { grid-template-columns: repeat(2, 1fr); }
++  .saved-grid { grid-template-columns: repeat(2, 1fr); }
+   .hero-logo { display: none; }
+   .hero h1 { font-size: 40px; }
+ }
+@@ -751,7 +987,7 @@ main { flex: 1 0 auto; }
+ }
+ @media (max-width: 560px) {
+   :root { --gutter: 20px; }
+-  .featured-grid, .card-grid, .search-grid, .activities-grid { grid-template-columns: 1fr; }
++  .featured-grid, .card-grid, .search-grid, .activities-grid, .saved-grid { grid-template-columns: 1fr; }
+   .category-grid { grid-template-columns: repeat(2, 1fr); }
+   .hero h1 { font-size: 30px; }
+   .hero-search { height: 50px; }
+diff --git a/wanderly_app-2/templates/base.html b/wanderly_app-2/templates/base.html
+index ecaf0ab..685de5a 100644
+--- a/wanderly_app-2/templates/base.html
++++ b/wanderly_app-2/templates/base.html
+@@ -23,7 +23,7 @@
+       <li><a href="{% url 'home' %}" {% if request.resolver_match.url_name == 'home' %}class="active"{% endif %}>Discover</a></li>
+       <li><a href="{% url 'compare' %}" {% if request.resolver_match.url_name == 'compare' %}class="active"{% endif %}>Compare</a></li>
+       <li><a href="#">Trips</a></li>
+-      <li><a href="#">Saved</a></li>
++      <li><a href="{% url 'saved' %}" {% if request.resolver_match.url_name == 'saved' %}class="active"{% endif %}>Saved</a></li>
+     </ul>
+ 
+     <form class="nav-search" action="{% url 'search' %}" method="get" role="search">
+diff --git a/wanderly_app-2/templates/core/home.html b/wanderly_app-2/templates/core/home.html
+index 064a8ac..f389099 100644
+--- a/wanderly_app-2/templates/core/home.html
++++ b/wanderly_app-2/templates/core/home.html
+@@ -42,29 +42,38 @@
+ 
+     <div class="featured-grid">
+       {% for sc in featured %}
+-      <a class="dest-card" href="{% url 'destination' sc.city.slug %}">
+-        <div class="dest-card-img">
+-          <img src="{% static 'images/dest/' %}{{ sc.city.image_file }}"
+-               alt="{{ sc.city.country.name }}"
+-               onerror="this.parentNode.classList.add('img-fallback');this.remove();" />
+-          <span class="img-fallback-glyph">{{ sc.city.emoji }}</span>
+-        </div>
+-        <div class="dest-card-body">
+-          <div class="dest-card-name">{{ sc.city.country.name }}</div>
+-          <div class="dest-card-meta">
+-            {{ sc.city.country.get_region_display }}{% if sc.city.safety_label %} · {{ sc.city.safety_label }}{% endif %} · {{ sc.city.budget_symbol }}
++      <div class="dest-card-wrap">
++        <a class="dest-card" href="{% url 'destination' sc.city.slug %}">
++          <div class="dest-card-img">
++            <img src="{% static 'images/dest/' %}{{ sc.city.image_file }}"
++                 alt="{{ sc.city.country.name }}"
++                 onerror="this.parentNode.classList.add('img-fallback');this.remove();" />
++            <span class="img-fallback-glyph">{{ sc.city.emoji }}</span>
+           </div>
+-          <div class="dest-card-tags">
+-            <span class="score-badge" title="{{ sc.explain }}">{{ sc.score }}/100 <span class="score-info">ⓘ</span></span>
+-            {% if sc.city.card_pill %}
+-              <span class="pill pill-soft">{{ sc.city.card_pill }}</span>
+-            {% endif %}
+-            {% if sc.city.get_primary_category_display != sc.city.card_pill %}
+-              <span class="pill pill-soft">{{ sc.city.get_primary_category_display }}</span>
+-            {% endif %}
++          <div class="dest-card-body">
++            <div class="dest-card-name">{{ sc.city.country.name }}</div>
++            <div class="dest-card-meta">
++              {{ sc.city.country.get_region_display }}{% if sc.city.safety_label %} · {{ sc.city.safety_label }}{% endif %} · {{ sc.city.budget_symbol }}
++            </div>
++            <div class="dest-card-tags">
++              <span class="score-badge" title="{{ sc.explain }}">{{ sc.score }}/100 <span class="score-info">ⓘ</span></span>
++              {% if sc.city.card_pill %}
++                <span class="pill pill-soft">{{ sc.city.card_pill }}</span>
++              {% endif %}
++              {% if sc.city.get_primary_category_display != sc.city.card_pill %}
++                <span class="pill pill-soft">{{ sc.city.get_primary_category_display }}</span>
++              {% endif %}
++            </div>
+           </div>
+-        </div>
+-      </a>
++        </a>
++        <button class="trip-save-btn"
++                data-destination="{{ sc.city.slug }}"
++                data-title="{{ sc.city.name }}"
++                onclick="saveTrip(this)"
++                title="Save to trips">
++          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M17 3H7a2 2 0 0 0-2 2v16l7-3 7 3V5a2 2 0 0 0-2-2z"/></svg>
++        </button>
++      </div>
+       {% empty %}
+         <p class="empty-note">No featured destinations yet. Run
+           <code>python manage.py seed_demo</code> to populate the demo data.</p>
+@@ -72,6 +81,41 @@
+     </div>
+   </section>
+ 
++  {% if user.is_authenticated %}
++  <script>
++  const _CSRF = (document.cookie.match(/csrftoken=([^;]+)/) || [])[1] || '';
++  async function saveTrip(btn) {
++    if (btn.classList.contains('saving')) return;
++    btn.classList.add('saving');
++    const destination = btn.dataset.destination;
++    const title = btn.dataset.title;
++    if (btn.classList.contains('saved')) {
++      btn.classList.remove('saved');
++      btn.classList.remove('saving');
++      return;
++    }
++    const res = await fetch('/api/trips/save/', {
++      method: 'POST',
++      headers: {'Content-Type': 'application/json', 'X-CSRFToken': _CSRF},
++      body: JSON.stringify({destination, title}),
++    });
++    btn.classList.remove('saving');
++    if (res.ok) {
++      const data = await res.json();
++      btn.classList.add('saved');
++      btn.dataset.tripId = data.id;
++      btn.title = 'Saved! Click to view';
++    }
++  }
++  </script>
++  {% else %}
++  <script>
++  function saveTrip() {
++    window.location.href = '/accounts/login/?next=' + encodeURIComponent(window.location.pathname);
++  }
++  </script>
++  {% endif %}
++
+   <!-- ===== Top Picks + Plan by Category ===== -->
+   <div class="discover-cols">
+ 
+diff --git a/wanderly_app-2/templates/core/saved.html b/wanderly_app-2/templates/core/saved.html
+new file mode 100644
+index 0000000..d95ef5c
+--- /dev/null
++++ b/wanderly_app-2/templates/core/saved.html
+@@ -0,0 +1,148 @@
++{% extends "base.html" %}
++{% load static %}
++
++{% block title %}Saved Trips · Wanderly{% endblock %}
++
++{% block content %}
++<div class="page">
++
++  <div class="saved-header">
++    <h1 class="saved-title">Saved Trips</h1>
++    <p class="saved-subtitle">Destinations you want to explore</p>
++  </div>
++
++  {% if trips %}
++
++  <div class="saved-tabs">
++    <button class="saved-tab active" data-filter="all">All <span class="tab-count">{{ trips|length }}</span></button>
++    <button class="saved-tab" data-filter="saved">Saved</button>
++    <button class="saved-tab" data-filter="completed">Completed</button>
++  </div>
++
++  <div class="saved-grid">
++    {% for trip in trips %}
++    <div class="saved-card" data-trip-id="{{ trip.id }}" data-status="{{ trip.status|default:'saved' }}">
++
++      <div class="saved-card-img">
++        {% if trip.city %}
++          <img src="{% static 'images/dest/' %}{{ trip.city.image_file }}"
++               alt="{{ trip.city.name }}"
++               onerror="this.parentNode.classList.add('img-fallback');this.remove();" />
++          <span class="img-fallback-glyph">{{ trip.city.emoji }}</span>
++        {% else %}
++          <span class="img-fallback-glyph">✈️</span>
++        {% endif %}
++
++        <span class="saved-status-badge saved-status-{{ trip.status|default:'saved' }}">
++          {% if trip.status == 'completed' %}Completed{% else %}Saved{% endif %}
++        </span>
++
++        <button class="saved-bookmark-btn active"
++                data-trip-id="{{ trip.id }}"
++                onclick="removeTrip('{{ trip.id }}', this)"
++                title="Remove from saved">
++          <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M17 3H7a2 2 0 0 0-2 2v16l7-3 7 3V5a2 2 0 0 0-2-2z"/></svg>
++        </button>
++      </div>
++
++      <div class="saved-card-body">
++        <div class="saved-card-name">
++          {% if trip.city %}{{ trip.city.name }}{% elif trip.title %}{{ trip.title }}{% else %}{{ trip.destination }}{% endif %}
++        </div>
++
++        {% if trip.city %}
++        <div class="saved-card-meta">
++          {{ trip.city.country.name }} · {{ trip.city.country.get_region_display }}
++          {% if trip.city.budget_symbol %} · {{ trip.city.budget_symbol }}{% endif %}
++        </div>
++        {% endif %}
++
++        {% if trip.start_date or trip.end_date %}
++        <div class="saved-card-dates">
++          📅 {% if trip.start_date %}{{ trip.start_date }}{% endif %}{% if trip.start_date and trip.end_date %} → {% endif %}{% if trip.end_date %}{{ trip.end_date }}{% endif %}
++        </div>
++        {% endif %}
++
++        {% if trip.notes %}
++        <div class="saved-card-notes">{{ trip.notes|truncatechars:80 }}</div>
++        {% endif %}
++
++        <div class="saved-card-actions">
++          {% if trip.city %}
++          <a href="{% url 'destination' trip.city.slug %}" class="saved-btn-view">View details →</a>
++          {% endif %}
++          {% if trip.status != 'completed' %}
++          <button class="saved-btn-complete" onclick="markComplete('{{ trip.id }}', this)">
++            ✓ Mark complete
++          </button>
++          {% endif %}
++        </div>
++      </div>
++    </div>
++    {% endfor %}
++  </div>
++
++  {% else %}
++
++  <div class="saved-empty">
++    <div class="saved-empty-icon">🗺️</div>
++    <h2 class="saved-empty-title">No saved trips yet</h2>
++    <p class="saved-empty-sub">
++      Browse destinations and click the
++      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle"><path d="M17 3H7a2 2 0 0 0-2 2v16l7-3 7 3V5a2 2 0 0 0-2-2z"/></svg>
++      bookmark to save them here.
++    </p>
++    <a href="{% url 'home' %}" class="saved-discover-btn">Discover destinations →</a>
++  </div>
++
++  {% endif %}
++
++</div>
++
++<script>
++const CSRF = (document.cookie.match(/csrftoken=([^;]+)/) || [])[1] || '';
++
++async function markComplete(tripId, btn) {
++  const res = await fetch(`/api/trips/${tripId}/complete/`, {
++    method: 'POST',
++    headers: {'X-CSRFToken': CSRF},
++  });
++  if (res.ok) {
++    const card = btn.closest('.saved-card');
++    const badge = card.querySelector('.saved-status-badge');
++    if (badge) {
++      badge.textContent = 'Completed';
++      badge.className = 'saved-status-badge saved-status-completed';
++    }
++    card.dataset.status = 'completed';
++    btn.remove();
++  }
++}
++
++async function removeTrip(tripId, btn) {
++  const res = await fetch(`/api/trips/${tripId}/unsave/`, {
++    method: 'POST',
++    headers: {'X-CSRFToken': CSRF},
++  });
++  if (res.ok) {
++    const card = btn.closest('.saved-card');
++    card.style.transition = 'opacity .25s, transform .25s';
++    card.style.opacity = '0';
++    card.style.transform = 'scale(0.95)';
++    setTimeout(() => card.remove(), 280);
++  }
++}
++
++// Tab filtering
++document.querySelectorAll('.saved-tab').forEach(tab => {
++  tab.addEventListener('click', () => {
++    document.querySelectorAll('.saved-tab').forEach(t => t.classList.remove('active'));
++    tab.classList.add('active');
++    const filter = tab.dataset.filter;
++    document.querySelectorAll('.saved-card').forEach(card => {
++      card.style.display = (filter === 'all' || card.dataset.status === filter) ? '' : 'none';
++    });
++  });
++});
++</script>
++{% endblock %}
+diff --git a/wanderly_app-2/templates/core/search.html b/wanderly_app-2/templates/core/search.html
+index 95c9482..cd1828a 100644
+--- a/wanderly_app-2/templates/core/search.html
++++ b/wanderly_app-2/templates/core/search.html
+@@ -50,22 +50,63 @@
+ 
+   <div class="search-grid">
+     {% for sc in results %}
+-    <a class="dest-card" href="{% url 'destination' sc.city.slug %}">
+-      <div class="dest-card-img-placeholder">{{ sc.city.emoji }}</div>
+-      <div class="dest-card-body">
+-        <div class="dest-card-name">{{ sc.city.name }}</div>
+-        <div class="dest-card-meta">
+-          {{ sc.city.country.get_region_display }} · {{ sc.city.budget_symbol }}
++    <div class="dest-card-wrap">
++      <a class="dest-card" href="{% url 'destination' sc.city.slug %}">
++        <div class="dest-card-img-placeholder">{{ sc.city.emoji }}</div>
++        <div class="dest-card-body">
++          <div class="dest-card-name">{{ sc.city.name }}</div>
++          <div class="dest-card-meta">
++            {{ sc.city.country.get_region_display }} · {{ sc.city.budget_symbol }}
++          </div>
++          <div class="dest-card-footer">
++            <span class="score-badge">{{ sc.score }}/100</span>
++            <span class="tag-pill tag-cultural">{{ sc.city.get_primary_category_display }}</span>
++          </div>
+         </div>
+-        <div class="dest-card-footer">
+-          <span class="score-badge">{{ sc.score }}/100</span>
+-          <span class="tag-pill tag-cultural">{{ sc.city.get_primary_category_display }}</span>
+-        </div>
+-      </div>
+-    </a>
++      </a>
++      <button class="trip-save-btn"
++              data-destination="{{ sc.city.slug }}"
++              data-title="{{ sc.city.name }}"
++              onclick="saveTrip(this)"
++              title="Save to trips">
++        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M17 3H7a2 2 0 0 0-2 2v16l7-3 7 3V5a2 2 0 0 0-2-2z"/></svg>
++      </button>
++    </div>
+     {% empty %}
+       <p style="color:#6B8A99;">No destinations match those filters.</p>
+     {% endfor %}
+   </div>
++
++  {% if user.is_authenticated %}
++  <script>
++  const _CSRF = (document.cookie.match(/csrftoken=([^;]+)/) || [])[1] || '';
++  async function saveTrip(btn) {
++    if (btn.classList.contains('saving')) return;
++    btn.classList.add('saving');
++    if (btn.classList.contains('saved')) {
++      btn.classList.remove('saved');
++      btn.classList.remove('saving');
++      return;
++    }
++    const res = await fetch('/api/trips/save/', {
++      method: 'POST',
++      headers: {'Content-Type': 'application/json', 'X-CSRFToken': _CSRF},
++      body: JSON.stringify({destination: btn.dataset.destination, title: btn.dataset.title}),
++    });
++    btn.classList.remove('saving');
++    if (res.ok) {
++      const data = await res.json();
++      btn.classList.add('saved');
++      btn.dataset.tripId = data.id;
++    }
++  }
++  </script>
++  {% else %}
++  <script>
++  function saveTrip() {
++    window.location.href = '/accounts/login/?next=' + encodeURIComponent(window.location.pathname);
++  }
++  </script>
++  {% endif %}
+ </div>
+ {% endblock %}
+diff --git a/wanderly_app-2/wanderly/settings.py b/wanderly_app-2/wanderly/settings.py
+index b979b48..6ae52d8 100644
+--- a/wanderly_app-2/wanderly/settings.py
++++ b/wanderly_app-2/wanderly/settings.py
+@@ -229,3 +229,16 @@ if not DEBUG:
+ WANDERLY_EXPLAINER_BACKEND = os.environ.get(
+     "WANDERLY_EXPLAINER_BACKEND", "intelligence.explainers.NullExplainer"
+ )
++
++
++# --- Supabase integration ----------------------------------------------------
++#
++# SUPABASE_URL and SUPABASE_ANON_KEY are safe to expose to the frontend.
++# SUPABASE_SERVICE_KEY has full DB access and must NEVER leave the backend.
++
++SUPABASE_URL = os.environ.get("SUPABASE_URL", "https://wnvacqanqusuaixvjuqf.supabase.co")
++SUPABASE_ANON_KEY = os.environ.get(
++    "SUPABASE_ANON_KEY",
++    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndudmFjcWFucXVzdWFpeHZqdXFmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA5MjgzNDcsImV4cCI6MjA5NjUwNDM0N30.oUsymMqK5bl7GOSpVwEjICF5gMgdtJRfzery2WLjIxE",
++)
++SUPABASE_SERVICE_KEY = os.environ.get("SUPABASE_SERVICE_KEY", "")
+diff --git a/wanderly_app-2/wanderly/supabase_client.py b/wanderly_app-2/wanderly/supabase_client.py
+new file mode 100644
+index 0000000..7b3b5cb
+--- /dev/null
++++ b/wanderly_app-2/wanderly/supabase_client.py
+@@ -0,0 +1,20 @@
++"""
++Singleton service-role Supabase client for backend use.
++
++The service-role key bypasses Row Level Security — keep it backend-only.
++Never pass this client or its key to the frontend.
++"""
++from __future__ import annotations
++
++from django.conf import settings
++
++_client = None
++
++
++def get_supabase():
++    """Return the lazily-initialised service-role Supabase client."""
++    global _client
++    if _client is None:
++        from supabase import create_client
++        _client = create_client(settings.SUPABASE_URL, settings.SUPABASE_SERVICE_KEY)
++    return _client
+diff --git a/wanderly_app-2/wanderly/urls.py b/wanderly_app-2/wanderly/urls.py
+index 4a5f43a..86c290f 100644
+--- a/wanderly_app-2/wanderly/urls.py
++++ b/wanderly_app-2/wanderly/urls.py
+@@ -5,7 +5,7 @@ from django.contrib import admin
+ from django.contrib.auth import views as auth_views
+ from django.urls import include, path
+ 
+-from web import views_auth
++from web import views_auth, views_trips
+ 
+ urlpatterns = [
+     path("admin/", admin.site.urls),
+@@ -13,6 +13,11 @@ urlpatterns = [
+     path("accounts/login/", views_auth.login_view, name="login"),
+     path("accounts/logout/", views_auth.logout_view, name="logout"),
+     path("accounts/account/", views_auth.account, name="account"),
++    # Trip API endpoints (JSON)
++    path("api/trips/save/", views_trips.save_trip, name="api_save_trip"),
++    path("api/trips/<str:trip_id>/unsave/", views_trips.unsave_trip, name="api_unsave_trip"),
++    path("api/trips/<str:trip_id>/complete/", views_trips.complete_trip, name="api_complete_trip"),
++    path("api/profile/", views_trips.profile_api, name="api_profile"),
+     path("accounts/password-reset/",
+          auth_views.PasswordResetView.as_view(template_name="auth/password_reset.html"),
+          name="password_reset"),
+diff --git a/wanderly_app-2/web/urls.py b/wanderly_app-2/web/urls.py
+index c3982ee..d8543a6 100644
+--- a/wanderly_app-2/web/urls.py
++++ b/wanderly_app-2/web/urls.py
+@@ -5,10 +5,12 @@ from __future__ import annotations
+ from django.urls import path
+ 
+ from . import views
++from .views_saved import saved
+ 
+ urlpatterns = [
+     path("", views.home, name="home"),
+     path("search/", views.search, name="search"),
+     path("destination/<slug:slug>/", views.destination, name="destination"),
+     path("compare/", views.compare, name="compare"),
++    path("saved/", saved, name="saved"),
+ ]
+diff --git a/wanderly_app-2/web/views_auth.py b/wanderly_app-2/web/views_auth.py
+index 7f8957f..0d6a2b9 100644
+--- a/wanderly_app-2/web/views_auth.py
++++ b/wanderly_app-2/web/views_auth.py
+@@ -1,56 +1,146 @@
+ from __future__ import annotations
+ 
+-from django.contrib.auth import authenticate, login, logout
++from django.contrib.auth import get_user_model, login, logout
+ from django.http import HttpRequest, HttpResponse
+ from django.shortcuts import redirect, render
+ 
+-from .form_auth import SignupForm, LoginForm
++from .form_auth import LoginForm, SignupForm
++
++User = get_user_model()
++
++
++def _supabase_sign_up(email: str, password: str):
++    """Call Supabase Auth sign_up. Returns (supabase_user, error_str)."""
++    from wanderly.supabase_client import get_supabase
++    try:
++        resp = get_supabase().auth.sign_up({"email": email, "password": password})
++        if resp.user is None:
++            return None, "Please check your email to confirm your account before signing in."
++        return resp.user, None
++    except Exception as exc:
++        msg = str(exc)
++        if "already registered" in msg.lower() or "already exists" in msg.lower():
++            return None, "An account with this email already exists."
++        return None, "Sign-up failed. Please try again."
++
++
++def _supabase_sign_in(email: str, password: str):
++    """Call Supabase Auth sign_in_with_password. Returns (supabase_user, session, error_str)."""
++    from wanderly.supabase_client import get_supabase
++    try:
++        resp = get_supabase().auth.sign_in_with_password({"email": email, "password": password})
++        if resp.user is None:
++            return None, None, "Invalid email or password."
++        return resp.user, resp.session, None
++    except Exception:
++        return None, None, "Invalid email or password."
++
++
++def _get_or_create_django_user(email: str, supabase_uid: str) -> User:
++    """Get or create a Django User linked to the given Supabase UID."""
++    try:
++        user = User.objects.get(supabase_uid=supabase_uid)
++        if user.email != email:
++            user.email = email
++            user.save(update_fields=["email"])
++        return user
++    except User.DoesNotExist:
++        pass
++
++    user, created = User.objects.get_or_create(
++        email=email,
++        defaults={"supabase_uid": supabase_uid},
++    )
++    if not created and not user.supabase_uid:
++        user.supabase_uid = supabase_uid
++        user.save(update_fields=["supabase_uid"])
++
++    if created:
++        user.set_unusable_password()
++        user.save(update_fields=["password"])
++
++    return user
+ 
+ 
+ def signup(request: HttpRequest) -> HttpResponse:
+     if request.user.is_authenticated:
+         return redirect("home")
++
+     form = SignupForm(request.POST or None)
++    error = None
++
+     if request.method == "POST" and form.is_valid():
+-        user = form.save()
+-        login(request, user, backend="django.contrib.auth.backends.ModelBackend")
+-        return redirect("home")
+-    return render(request, "auth/signup.html", {"form": form})
++        email = form.cleaned_data["email"]
++        password = form.cleaned_data["password1"]
++
++        sb_user, error = _supabase_sign_up(email, password)
++        if sb_user:
++            django_user = _get_or_create_django_user(email, str(sb_user.id))
++            # Carry over any name fields from the form
++            if hasattr(form, "cleaned_data"):
++                django_user.first_name = form.cleaned_data.get("first_name", "")
++                django_user.last_name = form.cleaned_data.get("last_name", "")
++                django_user.save(update_fields=["first_name", "last_name"])
++            login(request, django_user, backend="django.contrib.auth.backends.ModelBackend")
++            return redirect("home")
++
++    return render(request, "auth/signup.html", {"form": form, "error": error})
+ 
+ 
+ def login_view(request: HttpRequest) -> HttpResponse:
+     if request.user.is_authenticated:
+         return redirect("home")
++
+     form = LoginForm(request.POST or None)
+     error = None
++
+     if request.method == "POST" and form.is_valid():
+-        user = authenticate(
+-            request,
+-            username=form.cleaned_data["email"],
+-            password=form.cleaned_data["password"],
+-        )
+-        if user:
+-            login(request, user, backend="django.contrib.auth.backends.ModelBackend")
++        email = form.cleaned_data["email"]
++        password = form.cleaned_data["password"]
++
++        sb_user, sb_session, error = _supabase_sign_in(email, password)
++        if sb_user:
++            django_user = _get_or_create_django_user(email, str(sb_user.id))
++            if sb_session:
++                request.session["supabase_access_token"] = sb_session.access_token
++            login(request, django_user, backend="django.contrib.auth.backends.ModelBackend")
+             next_url = request.GET.get("next") or request.POST.get("next")
+             return redirect(next_url) if next_url else redirect("home")
+-        error = "Invalid email or password."
++
+     return render(request, "auth/login.html", {"form": form, "error": error})
+ 
+ 
+ def logout_view(request: HttpRequest) -> HttpResponse:
++    request.session.pop("supabase_access_token", None)
+     logout(request)
+     return redirect("login")
+ 
+ 
+ def account(request: HttpRequest) -> HttpResponse:
+-    from intelligence.models import UserProfile, SavedTrip
++    from intelligence.models import UserProfile
+     from destinations.models import ActivityCategory
+ 
+     if not request.user.is_authenticated:
+         return redirect("login")
+ 
+     profile, _ = UserProfile.objects.get_or_create(user=request.user)
+-    saved_trips = SavedTrip.objects.filter(user=request.user).select_related("city__country")[:6]
++
++    # Fetch Supabase profile if linked
++    supabase_profile = {}
++    if request.user.supabase_uid:
++        from wanderly.supabase_client import get_supabase
++        try:
++            result = (
++                get_supabase()
++                .table("Profiles")
++                .select("*")
++                .eq("id", request.user.supabase_uid)
++                .maybe_single()
++                .execute()
++            )
++            supabase_profile = result.data or {}
++        except Exception:
++            pass
+ 
+     if request.method == "POST":
+         profile.max_daily_budget_eur = int(request.POST.get("max_daily_budget_eur", 100))
+@@ -63,16 +153,29 @@ def account(request: HttpRequest) -> HttpResponse:
+         user.first_name = request.POST.get("first_name", user.first_name)
+         user.last_name = request.POST.get("last_name", user.last_name)
+         user.save(update_fields=["first_name", "last_name"])
++
++        # Update Supabase profile
++        if user.supabase_uid:
++            full_name = f"{user.first_name} {user.last_name}".strip()
++            from wanderly.supabase_client import get_supabase
++            try:
++                get_supabase().table("Profiles").upsert({
++                    "id": user.supabase_uid,
++                    "full_name": full_name,
++                }).execute()
++            except Exception:
++                pass
++
+         return redirect("account")
+ 
+     context = {
+         "profile": profile,
+-        "saved_trips": saved_trips,
++        "supabase_profile": supabase_profile,
+         "activity_categories": ActivityCategory.choices,
+         "months": [
+-            (1,"January"),(2,"February"),(3,"March"),(4,"April"),
+-            (5,"May"),(6,"June"),(7,"July"),(8,"August"),
+-            (9,"September"),(10,"October"),(11,"November"),(12,"December"),
++            (1, "January"), (2, "February"), (3, "March"), (4, "April"),
++            (5, "May"), (6, "June"), (7, "July"), (8, "August"),
++            (9, "September"), (10, "October"), (11, "November"), (12, "December"),
+         ],
+     }
+-    return render(request, "auth/profile.html", context)
+\ No newline at end of file
++    return render(request, "auth/profile.html", context)
+diff --git a/wanderly_app-2/web/views_saved.py b/wanderly_app-2/web/views_saved.py
+new file mode 100644
+index 0000000..cecade8
+--- /dev/null
++++ b/wanderly_app-2/web/views_saved.py
+@@ -0,0 +1,35 @@
++"""Saved trips page view."""
++from __future__ import annotations
++
++from django.contrib.auth.decorators import login_required
++from django.shortcuts import render
++
++
++@login_required
++def saved(request):
++    from wanderly.supabase_client import get_supabase
++    from destinations.models import City
++
++    uid = request.user.supabase_uid
++    trips = []
++
++    if uid:
++        sb = get_supabase()
++        result = (
++            sb.table("trips")
++            .select("*")
++            .eq("user_id", uid)
++            .order("created_at", desc=True)
++            .execute()
++        )
++        raw = result.data or []
++
++        slugs = [t["destination"] for t in raw if t.get("destination")]
++        cities = {c.slug: c for c in City.objects.filter(slug__in=slugs).select_related("country")}
++
++        for trip in raw:
++            trip["city"] = cities.get(trip.get("destination"))
++
++        trips = raw
++
++    return render(request, "core/saved.html", {"trips": trips})
+diff --git a/wanderly_app-2/web/views_trips.py b/wanderly_app-2/web/views_trips.py
+new file mode 100644
+index 0000000..2ddd4b9
+--- /dev/null
++++ b/wanderly_app-2/web/views_trips.py
+@@ -0,0 +1,107 @@
++"""
++Trip management views — all endpoints return JSON and require an active
++Django session (CSRF + session-cookie auth, service-role Supabase client).
++"""
++from __future__ import annotations
++
++import json
++
++from django.contrib.auth.decorators import login_required
++from django.http import JsonResponse
++from django.views.decorators.http import require_POST
++
++
++def _uid(request) -> str | None:
++    return request.user.supabase_uid
++
++
++@login_required
++@require_POST
++def save_trip(request) -> JsonResponse:
++    """Create or mark-as-saved a trip for a destination slug."""
++    from wanderly.supabase_client import get_supabase
++
++    uid = _uid(request)
++    if not uid:
++        return JsonResponse({"error": "No Supabase account linked to your profile."}, status=400)
++
++    try:
++        body = json.loads(request.body)
++    except (json.JSONDecodeError, ValueError):
++        return JsonResponse({"error": "Invalid JSON body."}, status=400)
++
++    destination = (body.get("destination") or "").strip()
++    title = (body.get("title") or destination).strip()
++
++    if not destination:
++        return JsonResponse({"error": "destination is required."}, status=400)
++
++    sb = get_supabase()
++
++    existing = (
++        sb.table("trips")
++        .select("id, status")
++        .eq("user_id", uid)
++        .eq("destination", destination)
++        .execute()
++    )
++
++    if existing.data:
++        trip_id = existing.data[0]["id"]
++        sb.table("trips").update({"status": "saved", "title": title}).eq("id", trip_id).execute()
++        return JsonResponse({"id": trip_id, "status": "saved", "action": "updated"})
++
++    result = sb.table("trips").insert({
++        "user_id": uid,
++        "destination": destination,
++        "title": title,
++        "status": "saved",
++    }).execute()
++    trip = result.data[0] if result.data else {}
++    return JsonResponse({"id": trip.get("id"), "status": "saved", "action": "created"})
++
++
++@login_required
++@require_POST
++def unsave_trip(request, trip_id: str) -> JsonResponse:
++    from wanderly.supabase_client import get_supabase
++    uid = _uid(request)
++    if not uid:
++        return JsonResponse({"error": "No Supabase account linked."}, status=400)
++    get_supabase().table("trips").delete().eq("id", trip_id).eq("user_id", uid).execute()
++    return JsonResponse({"status": "deleted"})
++
++
++@login_required
++@require_POST
++def complete_trip(request, trip_id: str) -> JsonResponse:
++    from wanderly.supabase_client import get_supabase
++    uid = _uid(request)
++    if not uid:
++        return JsonResponse({"error": "No Supabase account linked."}, status=400)
++    get_supabase().table("trips").update({"status": "completed"}).eq("id", trip_id).eq("user_id", uid).execute()
++    return JsonResponse({"status": "completed"})
++
++
++@login_required
++def profile_api(request) -> JsonResponse:
++    """GET/POST the user's Supabase profile (full_name, avatar_url)."""
++    from wanderly.supabase_client import get_supabase
++    uid = _uid(request)
++    if not uid:
++        return JsonResponse({"error": "No Supabase account linked."}, status=400)
++
++    sb = get_supabase()
++
++    if request.method == "POST":
++        try:
++            body = json.loads(request.body)
++        except (json.JSONDecodeError, ValueError):
++            return JsonResponse({"error": "Invalid JSON body."}, status=400)
++        payload = {k: v for k, v in body.items() if k in ("full_name", "avatar_url")}
++        payload["id"] = uid
++        result = sb.table("Profiles").upsert(payload).execute()
++        return JsonResponse({"profile": result.data[0] if result.data else {}})
++
++    result = sb.table("Profiles").select("*").eq("id", uid).maybe_single().execute()
++    return JsonResponse({"profile": result.data or {}})
+-- 
+2.43.0
+
