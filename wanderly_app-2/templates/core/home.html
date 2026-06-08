@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% load static %}
+{% load static dest_images %}
 
 {% block title %}Wanderly — Where will you go next?{% endblock %}
 
@@ -9,7 +9,7 @@
 <section class="hero">
   <div class="hero-inner">
     <div class="hero-logo">
-      <img src="{% static 'images/dest/wanderly-hero.png' %}" alt="Wanderly"
+      <img src="{% static 'images/wanderly-logo.png' %}" alt="Wanderly"
            onerror="this.style.display='none'" />
     </div>
     <div class="hero-copy">
@@ -45,7 +45,7 @@
       <div class="dest-card-wrap">
         <a class="dest-card" href="{% url 'destination' sc.city.slug %}">
           <div class="dest-card-img">
-            <img src="{% static 'images/dest/' %}{{ sc.city.image_file }}"
+            <img src="{{ sc.city.image_file|dest_img_url }}"
                  alt="{{ sc.city.country.name }}"
                  onerror="this.parentNode.classList.add('img-fallback');this.remove();" />
             <span class="img-fallback-glyph">{{ sc.city.emoji }}</span>
@@ -83,28 +83,69 @@
 
   {% if user.is_authenticated %}
   <script>
-  const _CSRF = (document.cookie.match(/csrftoken=([^;]+)/) || [])[1] || '';
+  const _CSRF = document.querySelector('meta[name="csrf-token"]')?.content || '';
+  const _SAVED_MAP = {{ saved_trip_map_json }};
+
+  document.querySelectorAll('.trip-save-btn').forEach(btn => {
+    const slug = btn.dataset.destination;
+    if (slug && _SAVED_MAP[slug]) {
+      btn.classList.add('saved');
+      btn.dataset.tripId = _SAVED_MAP[slug];
+      btn.title = 'Saved — click to unsave';
+    }
+  });
+
   async function saveTrip(btn) {
     if (btn.classList.contains('saving')) return;
     btn.classList.add('saving');
     const destination = btn.dataset.destination;
     const title = btn.dataset.title;
+
     if (btn.classList.contains('saved')) {
-      btn.classList.remove('saved');
-      btn.classList.remove('saving');
+      const tripId = btn.dataset.tripId;
+      if (!tripId) { btn.classList.remove('saving'); return; }
+      try {
+        const res = await fetch(`/api/trips/${tripId}/unsave/`, {
+          method: 'POST',
+          headers: {'X-CSRFToken': _CSRF},
+        });
+        if (res.ok) {
+          btn.classList.remove('saved');
+          btn.dataset.tripId = '';
+          btn.title = 'Save to trips';
+          delete _SAVED_MAP[destination];
+        } else {
+          console.error('Unsave failed', res.status, await res.text());
+        }
+      } catch(e) {
+        console.error('Unsave error', e);
+      } finally {
+        btn.classList.remove('saving');
+      }
       return;
     }
-    const res = await fetch('/api/trips/save/', {
-      method: 'POST',
-      headers: {'Content-Type': 'application/json', 'X-CSRFToken': _CSRF},
-      body: JSON.stringify({destination, title}),
-    });
-    btn.classList.remove('saving');
-    if (res.ok) {
-      const data = await res.json();
-      btn.classList.add('saved');
-      btn.dataset.tripId = data.id;
-      btn.title = 'Saved! Click to view';
+
+    try {
+      const res = await fetch('/api/trips/save/', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json', 'X-CSRFToken': _CSRF},
+        body: JSON.stringify({destination, title}),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        btn.classList.add('saved');
+        btn.dataset.tripId = data.id;
+        btn.title = 'Saved — click to unsave';
+        _SAVED_MAP[destination] = data.id;
+      } else {
+        const err = await res.json().catch(() => ({}));
+        console.error('Save failed', res.status, err);
+        btn.title = err.error || 'Save failed — check console';
+      }
+    } catch(e) {
+      console.error('Save error', e);
+    } finally {
+      btn.classList.remove('saving');
     }
   }
   </script>
@@ -125,7 +166,7 @@
         {% for sc in top_picks %}
         <a class="pick-row" href="{% url 'destination' sc.city.slug %}">
           <span class="pick-thumb">
-            <img src="{% static 'images/dest/' %}{{ sc.city.image_file }}"
+            <img src="{{ sc.city.image_file|dest_img_url }}"
                  alt="{{ sc.city.country.name }}"
                  onerror="this.parentNode.classList.add('img-fallback');this.remove();" />
             <span class="img-fallback-glyph">{{ sc.city.emoji }}</span>

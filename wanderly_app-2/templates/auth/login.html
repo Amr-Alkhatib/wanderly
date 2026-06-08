@@ -15,9 +15,17 @@
     <h1 class="auth-title">Welcome back</h1>
     <p class="auth-subtitle">Sign in to your account to continue exploring</p>
 
-    {% if form.non_field_errors %}
+    {% if reset_success %}
+    <div style="background:#d1fae5;color:#065f46;border:1px solid #6ee7b7;border-radius:8px;padding:12px 16px;margin-bottom:20px;font-size:14px;font-weight:500;" role="alert">
+      Password reset successful. Sign in with your new password.
+    </div>
+    {% endif %}
+
+    {% if error %}
+    <div class="auth-errors" role="alert">{{ error }}</div>
+    {% elif form.non_field_errors %}
     <div class="auth-errors" role="alert">
-      {% for error in form.non_field_errors %}{{ error }}{% endfor %}
+      {% for e in form.non_field_errors %}{{ e }}{% endfor %}
     </div>
     {% endif %}
 

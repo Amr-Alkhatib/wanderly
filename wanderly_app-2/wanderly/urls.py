@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 from django.contrib import admin
-from django.contrib.auth import views as auth_views
 from django.urls import include, path
 
 from web import views_auth, views_trips
@@ -13,22 +12,13 @@ urlpatterns = [
     path("accounts/login/", views_auth.login_view, name="login"),
     path("accounts/logout/", views_auth.logout_view, name="logout"),
     path("accounts/account/", views_auth.account, name="account"),
+    # Password reset (Supabase-backed)
+    path("accounts/password-reset/", views_auth.forgot_password, name="password_reset"),
+    path("accounts/reset-password/confirm/", views_auth.reset_password_confirm, name="reset_password_confirm"),
     # Trip API endpoints (JSON)
     path("api/trips/save/", views_trips.save_trip, name="api_save_trip"),
     path("api/trips/<str:trip_id>/unsave/", views_trips.unsave_trip, name="api_unsave_trip"),
     path("api/trips/<str:trip_id>/complete/", views_trips.complete_trip, name="api_complete_trip"),
     path("api/profile/", views_trips.profile_api, name="api_profile"),
-    path("accounts/password-reset/",
-         auth_views.PasswordResetView.as_view(template_name="auth/password_reset.html"),
-         name="password_reset"),
-    path("accounts/password-reset/done/",
-         auth_views.PasswordResetDoneView.as_view(template_name="auth/password_reset_done.html"),
-         name="password_reset_done"),
-    path("accounts/password-reset/<uidb64>/<token>/",
-         auth_views.PasswordResetConfirmView.as_view(template_name="auth/password_reset_confirm.html"),
-         name="password_reset_confirm"),
-    path("accounts/password-reset/complete/",
-         auth_views.PasswordResetCompleteView.as_view(template_name="auth/password_reset_complete.html"),
-         name="password_reset_complete"),
     path("", include("web.urls")),
 ]

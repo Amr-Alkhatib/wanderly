@@ -24,10 +24,87 @@
   </div>
 
   <!-- Action bar -->
-  <div style="display: flex; gap: 12px; margin-bottom: 24px; flex-wrap: wrap;">
+  <div style="display: flex; gap: 12px; margin-bottom: 24px; flex-wrap: wrap; align-items: center;">
     <a href="{% url 'compare' %}?city={{ city.slug }}" class="btn-primary">⚖️ Compare</a>
     <a href="{% url 'search' %}?region={{ city.country.region }}" style="background: rgba(0,0,0,0.07); color: #3A5A6A; padding: 10px 20px; border-radius: 8px; font-size: 14px; font-weight: 600;">More from {{ city.country.get_region_display }}</a>
+    <button id="destSaveBtn"
+            class="trip-save-btn dest-save-btn-inline"
+            data-destination="{{ city.slug }}"
+            data-title="{{ city.name }}"
+            onclick="saveDestTrip(this)"
+            title="Save to trips">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M17 3H7a2 2 0 0 0-2 2v16l7-3 7 3V5a2 2 0 0 0-2-2z"/></svg>
+      <span id="destSaveBtnLabel">Save</span>
+    </button>
   </div>
+
+  {% if user.is_authenticated %}
+  <script>
+  const _DEST_CSRF = document.querySelector('meta[name="csrf-token"]')?.content || '';
+  const _DEST_SAVED_MAP = {{ saved_trip_map_json }};
+
+  (function initDestBtn() {
+    const btn = document.getElementById('destSaveBtn');
+    const slug = btn && btn.dataset.destination;
+    if (slug && _DEST_SAVED_MAP[slug]) {
+      btn.classList.add('saved');
+      btn.dataset.tripId = _DEST_SAVED_MAP[slug];
+      document.getElementById('destSaveBtnLabel').textContent = 'Saved';
+    }
+  })();
+
+  async function saveDestTrip(btn) {
+    if (btn.classList.contains('saving')) return;
+    btn.classList.add('saving');
+    const destination = btn.dataset.destination;
+    const title = btn.dataset.title;
+    const label = document.getElementById('destSaveBtnLabel');
+
+    if (btn.classList.contains('saved')) {
+      const tripId = btn.dataset.tripId;
+      if (!tripId) { btn.classList.remove('saving'); return; }
+      try {
+        const res = await fetch(`/api/trips/${tripId}/unsave/`, {
+          method: 'POST',
+          headers: {'X-CSRFToken': _DEST_CSRF},
+        });
+        if (res.ok) {
+          btn.classList.remove('saved');
+          btn.dataset.tripId = '';
+          label.textContent = 'Save';
+          delete _DEST_SAVED_MAP[destination];
+        }
+      } finally {
+        btn.classList.remove('saving');
+      }
+      return;
+    }
+
+    try {
+      const res = await fetch('/api/trips/save/', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json', 'X-CSRFToken': _DEST_CSRF},
+        body: JSON.stringify({destination, title}),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        btn.classList.add('saved');
+        btn.dataset.tripId = data.id;
+        label.textContent = 'Saved';
+        _DEST_SAVED_MAP[destination] = data.id;
+      }
+    } finally {
+      btn.classList.remove('saving');
+    }
+  }
+  </script>
+  {% else %}
+  <script>
+  function saveDestTrip() {
+    window.location.href = '/accounts/login/?next=' + encodeURIComponent(window.location.pathname);
+  }
+  </script>
+  {% endif %}
 
   <!-- WHY: the explainability panel (the product's core promise) -->
   <div class="info-card" style="margin-bottom: 28px; border-left: 4px solid var(--orange);">

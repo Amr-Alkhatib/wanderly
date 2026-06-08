@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% load static %}
+{% load static dest_images %}
 
 {% block title %}Saved Trips · Wanderly{% endblock %}
 
@@ -10,6 +10,10 @@
     <h1 class="saved-title">Saved Trips</h1>
     <p class="saved-subtitle">Destinations you want to explore</p>
   </div>
+
+  {% if error_msg %}
+  <div class="auth-errors" role="alert" style="margin-bottom:24px;">{{ error_msg }}</div>
+  {% endif %}
 
   {% if trips %}
 
@@ -25,7 +29,7 @@
 
       <div class="saved-card-img">
         {% if trip.city %}
-          <img src="{% static 'images/dest/' %}{{ trip.city.image_file }}"
+          <img src="{{ trip.city.image_file|dest_img_url }}"
                alt="{{ trip.city.name }}"
                onerror="this.parentNode.classList.add('img-fallback');this.remove();" />
           <span class="img-fallback-glyph">{{ trip.city.emoji }}</span>
@@ -100,7 +104,7 @@
 </div>
 
 <script>
-const CSRF = (document.cookie.match(/csrftoken=([^;]+)/) || [])[1] || '';
+const CSRF = document.querySelector('meta[name="csrf-token"]')?.content || '';
 
 async function markComplete(tripId, btn) {
   const res = await fetch(`/api/trips/${tripId}/complete/`, {

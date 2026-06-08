@@ -16,14 +16,16 @@ credentials) are read from the environment so the same code runs safely
 in local dev, CI, and production. Sensible local-dev defaults are
 provided so a fresh checkout runs with zero configuration.
 """
-
 from __future__ import annotations
+from dotenv import load_dotenv
+
+
 
 import os
 from pathlib import Path
 
 BASE_DIR = Path(__file__).resolve().parent.parent
-
+load_dotenv()
 
 def _env_bool(name: str, default: bool) -> bool:
     """Read a boolean from the environment ('1', 'true', 'yes' -> True)."""

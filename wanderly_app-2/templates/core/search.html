@@ -79,25 +79,69 @@
 
   {% if user.is_authenticated %}
   <script>
-  const _CSRF = (document.cookie.match(/csrftoken=([^;]+)/) || [])[1] || '';
+  const _CSRF = document.querySelector('meta[name="csrf-token"]')?.content || '';
+  const _SAVED_MAP = {{ saved_trip_map_json }};
+
+  document.querySelectorAll('.trip-save-btn').forEach(btn => {
+    const slug = btn.dataset.destination;
+    if (slug && _SAVED_MAP[slug]) {
+      btn.classList.add('saved');
+      btn.dataset.tripId = _SAVED_MAP[slug];
+      btn.title = 'Saved — click to unsave';
+    }
+  });
+
   async function saveTrip(btn) {
     if (btn.classList.contains('saving')) return;
     btn.classList.add('saving');
+    const destination = btn.dataset.destination;
+    const title = btn.dataset.title;
+
     if (btn.classList.contains('saved')) {
-      btn.classList.remove('saved');
-      btn.classList.remove('saving');
+      const tripId = btn.dataset.tripId;
+      if (!tripId) { btn.classList.remove('saving'); return; }
+      try {
+        const res = await fetch(`/api/trips/${tripId}/unsave/`, {
+          method: 'POST',
+          headers: {'X-CSRFToken': _CSRF},
+        });
+        if (res.ok) {
+          btn.classList.remove('saved');
+          btn.dataset.tripId = '';
+          btn.title = 'Save to trips';
+          delete _SAVED_MAP[destination];
+        } else {
+          console.error('Unsave failed', res.status, await res.text());
+        }
+      } catch(e) {
+        console.error('Unsave error', e);
+      } finally {
+        btn.classList.remove('saving');
+      }
       return;
     }
-    const res = await fetch('/api/trips/save/', {
-      method: 'POST',
-      headers: {'Content-Type': 'application/json', 'X-CSRFToken': _CSRF},
-      body: JSON.stringify({destination: btn.dataset.destination, title: btn.dataset.title}),
-    });
-    btn.classList.remove('saving');
-    if (res.ok) {
-      const data = await res.json();
-      btn.classList.add('saved');
-      btn.dataset.tripId = data.id;
+
+    try {
+      const res = await fetch('/api/trips/save/', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json', 'X-CSRFToken': _CSRF},
+        body: JSON.stringify({destination, title}),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        btn.classList.add('saved');
+        btn.dataset.tripId = data.id;
+        btn.title = 'Saved — click to unsave';
+        _SAVED_MAP[destination] = data.id;
+      } else {
+        const err = await res.json().catch(() => ({}));
+        console.error('Save failed', res.status, err);
+        btn.title = err.error || 'Save failed — check console';
+      }
+    } catch(e) {
+      console.error('Save error', e);
+    } finally {
+      btn.classList.remove('saving');
     }
   }
   </script>

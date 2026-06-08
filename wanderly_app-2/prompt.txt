@@ -1,0 +1,55 @@
+You did not fully solve the previous task. Please make these exact frontend fixes only, without changing backend logic, models, views, URLs, seeds, auth, or database code.
+
+Goals:
+1. Replace the static country/destination pictures with working internet image URLs
+2. Make the added logos a bit bigger so they fit their surroundings better
+3. Add the browser tab icon (favicon) in the <head> using a <link> tag, and use the same logo I recently added
+
+Detailed instructions:
+
+1) Country / destination images
+- Find the country or destination cards/sections currently using corrupted or broken static image files
+- Replace those image sources with working internet image URLs instead of local broken static files
+- Use relevant real images for the countries/destinations that exist in the seed data
+- Match each destination with an appropriate image
+- Keep the existing seed data, slugs, and card structure unchanged
+- Do not break the templates if some cards are rendered dynamically
+- If images are referenced from templates, update only the template logic needed
+- Make sure all replacement image URLs load correctly in the browser
+- Prefer stable direct image URLs that render reliably
+
+2) Logo sizing
+- The logos you added in the navbar and in the hero/center section are too small
+- Increase both logos so their size feels visually proportional to nearby text, buttons, and layout elements
+- Keep the layout clean and responsive
+- Do not make them oversized or misaligned
+- The navbar logo should feel balanced with the nav height and brand text
+- The hero logo should feel balanced with the main heading and search area
+
+3) Favicon / browser tab icon
+- In the global base template head section, add or fix the favicon using a standard link tag
+- Use the same logo asset I recently added
+- Example target pattern: <link rel="icon" href="...">
+- Use the proper Django static path
+- Make sure the favicon works across all pages, not just the home page
+
+4) Static/template handling
+- Inspect the actual logo filename under static/image and use the correct path
+- Use {% load static %} where needed
+- Do not leave any old corrupted logo reference in use
+
+5) Scope
+- Frontend asset/template changes only
+- Do not modify business logic
+- Do not refactor unrelated code
+- Do not change page copy unless needed for markup consistency
+
+Deliverables:
+- List every file changed
+- Show the exact lines changed for:
+  a) navbar logo sizing
+  b) hero logo sizing
+  c) favicon link in the head
+  d) country/destination image src replacements
+- State the final logo path used
+- State which image URLs were used for each seeded country/destination

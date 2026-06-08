@@ -10,6 +10,8 @@ score.
 
 from __future__ import annotations
 
+import json
+
 from django.db.models import Prefetch
 from django.http import HttpRequest, HttpResponse
 from django.shortcuts import get_object_or_404, render
@@ -82,11 +84,15 @@ def home(request: HttpRequest) -> HttpResponse:
         ("Nature", ActivityCategory.NATURE, "#408c59"),
     ]
 
+    from web.views_saved import get_saved_trip_map
+    saved_trip_map = get_saved_trip_map(request.user)
+
     context = {
         "featured": featured,
         "top_picks": top_picks,
         "category_tiles": category_tiles,
         "suggestion_pills": featured + top_picks,
+        "saved_trip_map_json": json.dumps(saved_trip_map),
     }
     return render(request, "core/home.html", context)
 
@@ -118,6 +124,9 @@ def search(request: HttpRequest) -> HttpResponse:
     engine = RecommendationEngine(Preferences(safety_priority=safety_priority))
     results = engine.rank(qs.distinct())
 
+    from web.views_saved import get_saved_trip_map
+    saved_trip_map = get_saved_trip_map(request.user)
+
     context = {
         "results": results,
         "result_count": len(results),
@@ -130,6 +139,7 @@ def search(request: HttpRequest) -> HttpResponse:
             "category": category,
             "q": query,
         },
+        "saved_trip_map_json": json.dumps(saved_trip_map),
     }
     return render(request, "core/search.html", context)
 
@@ -147,6 +157,9 @@ def destination(request: HttpRequest, slug: str) -> HttpResponse:
     latest_cost = city.cost_snapshots.order_by("-captured_at").first()
     latest_safety = city.safety_advisories.order_by("-captured_at").first()
 
+    from web.views_saved import get_saved_trip_map
+    saved_trip_map = get_saved_trip_map(request.user)
+
     context = {
         "city": city,
         "scored": scored,
@@ -154,6 +167,7 @@ def destination(request: HttpRequest, slug: str) -> HttpResponse:
         "latest_cost": latest_cost,
         "latest_safety": latest_safety,
         "weather": city.weather.order_by("month"),
+        "saved_trip_map_json": json.dumps(saved_trip_map),
         "activities": city.activities.all(),
     }
     return render(request, "core/destination.html", context)

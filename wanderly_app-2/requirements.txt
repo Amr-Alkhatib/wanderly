@@ -1,6 +1,9 @@
 # Core framework
 Django==5.1.4
+python-dotenv
 asgiref==3.8.1
+
+
 sqlparse==0.5.3
 
 # PostgreSQL driver (production DB; SQLite needs no driver for local dev)
