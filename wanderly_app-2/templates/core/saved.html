@@ -1,0 +1,148 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Saved Trips · Wanderly{% endblock %}
+
+{% block content %}
+<div class="page">
+
+  <div class="saved-header">
+    <h1 class="saved-title">Saved Trips</h1>
+    <p class="saved-subtitle">Destinations you want to explore</p>
+  </div>
+
+  {% if trips %}
+
+  <div class="saved-tabs">
+    <button class="saved-tab active" data-filter="all">All <span class="tab-count">{{ trips|length }}</span></button>
+    <button class="saved-tab" data-filter="saved">Saved</button>
+    <button class="saved-tab" data-filter="completed">Completed</button>
+  </div>
+
+  <div class="saved-grid">
+    {% for trip in trips %}
+    <div class="saved-card" data-trip-id="{{ trip.id }}" data-status="{{ trip.status|default:'saved' }}">
+
+      <div class="saved-card-img">
+        {% if trip.city %}
+          <img src="{% static 'images/dest/' %}{{ trip.city.image_file }}"
+               alt="{{ trip.city.name }}"
+               onerror="this.parentNode.classList.add('img-fallback');this.remove();" />
+          <span class="img-fallback-glyph">{{ trip.city.emoji }}</span>
+        {% else %}
+          <span class="img-fallback-glyph">✈️</span>
+        {% endif %}
+
+        <span class="saved-status-badge saved-status-{{ trip.status|default:'saved' }}">
+          {% if trip.status == 'completed' %}Completed{% else %}Saved{% endif %}
+        </span>
+
+        <button class="saved-bookmark-btn active"
+                data-trip-id="{{ trip.id }}"
+                onclick="removeTrip('{{ trip.id }}', this)"
+                title="Remove from saved">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M17 3H7a2 2 0 0 0-2 2v16l7-3 7 3V5a2 2 0 0 0-2-2z"/></svg>
+        </button>
+      </div>
+
+      <div class="saved-card-body">
+        <div class="saved-card-name">
+          {% if trip.city %}{{ trip.city.name }}{% elif trip.title %}{{ trip.title }}{% else %}{{ trip.destination }}{% endif %}
+        </div>
+
+        {% if trip.city %}
+        <div class="saved-card-meta">
+          {{ trip.city.country.name }} · {{ trip.city.country.get_region_display }}
+          {% if trip.city.budget_symbol %} · {{ trip.city.budget_symbol }}{% endif %}
+        </div>
+        {% endif %}
+
+        {% if trip.start_date or trip.end_date %}
+        <div class="saved-card-dates">
+          📅 {% if trip.start_date %}{{ trip.start_date }}{% endif %}{% if trip.start_date and trip.end_date %} → {% endif %}{% if trip.end_date %}{{ trip.end_date }}{% endif %}
+        </div>
+        {% endif %}
+
+        {% if trip.notes %}
+        <div class="saved-card-notes">{{ trip.notes|truncatechars:80 }}</div>
+        {% endif %}
+
+        <div class="saved-card-actions">
+          {% if trip.city %}
+          <a href="{% url 'destination' trip.city.slug %}" class="saved-btn-view">View details →</a>
+          {% endif %}
+          {% if trip.status != 'completed' %}
+          <button class="saved-btn-complete" onclick="markComplete('{{ trip.id }}', this)">
+            ✓ Mark complete
+          </button>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+
+  {% else %}
+
+  <div class="saved-empty">
+    <div class="saved-empty-icon">🗺️</div>
+    <h2 class="saved-empty-title">No saved trips yet</h2>
+    <p class="saved-empty-sub">
+      Browse destinations and click the
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle"><path d="M17 3H7a2 2 0 0 0-2 2v16l7-3 7 3V5a2 2 0 0 0-2-2z"/></svg>
+      bookmark to save them here.
+    </p>
+    <a href="{% url 'home' %}" class="saved-discover-btn">Discover destinations →</a>
+  </div>
+
+  {% endif %}
+
+</div>
+
+<script>
+const CSRF = (document.cookie.match(/csrftoken=([^;]+)/) || [])[1] || '';
+
+async function markComplete(tripId, btn) {
+  const res = await fetch(`/api/trips/${tripId}/complete/`, {
+    method: 'POST',
+    headers: {'X-CSRFToken': CSRF},
+  });
+  if (res.ok) {
+    const card = btn.closest('.saved-card');
+    const badge = card.querySelector('.saved-status-badge');
+    if (badge) {
+      badge.textContent = 'Completed';
+      badge.className = 'saved-status-badge saved-status-completed';
+    }
+    card.dataset.status = 'completed';
+    btn.remove();
+  }
+}
+
+async function removeTrip(tripId, btn) {
+  const res = await fetch(`/api/trips/${tripId}/unsave/`, {
+    method: 'POST',
+    headers: {'X-CSRFToken': CSRF},
+  });
+  if (res.ok) {
+    const card = btn.closest('.saved-card');
+    card.style.transition = 'opacity .25s, transform .25s';
+    card.style.opacity = '0';
+    card.style.transform = 'scale(0.95)';
+    setTimeout(() => card.remove(), 280);
+  }
+}
+
+// Tab filtering
+document.querySelectorAll('.saved-tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    document.querySelectorAll('.saved-tab').forEach(t => t.classList.remove('active'));
+    tab.classList.add('active');
+    const filter = tab.dataset.filter;
+    document.querySelectorAll('.saved-card').forEach(card => {
+      card.style.display = (filter === 'all' || card.dataset.status === filter) ? '' : 'none';
+    });
+  });
+});
+</script>
+{% endblock %}

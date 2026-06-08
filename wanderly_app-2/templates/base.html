@@ -23,7 +23,7 @@
       <li><a href="{% url 'home' %}" {% if request.resolver_match.url_name == 'home' %}class="active"{% endif %}>Discover</a></li>
       <li><a href="{% url 'compare' %}" {% if request.resolver_match.url_name == 'compare' %}class="active"{% endif %}>Compare</a></li>
       <li><a href="#">Trips</a></li>
-      <li><a href="#">Saved</a></li>
+      <li><a href="{% url 'saved' %}" {% if request.resolver_match.url_name == 'saved' %}class="active"{% endif %}>Saved</a></li>
     </ul>
 
     <form class="nav-search" action="{% url 'search' %}" method="get" role="search">

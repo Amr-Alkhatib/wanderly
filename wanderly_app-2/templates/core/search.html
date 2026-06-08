@@ -50,22 +50,63 @@
 
   <div class="search-grid">
     {% for sc in results %}
-    <a class="dest-card" href="{% url 'destination' sc.city.slug %}">
-      <div class="dest-card-img-placeholder">{{ sc.city.emoji }}</div>
-      <div class="dest-card-body">
-        <div class="dest-card-name">{{ sc.city.name }}</div>
-        <div class="dest-card-meta">
-          {{ sc.city.country.get_region_display }} · {{ sc.city.budget_symbol }}
+    <div class="dest-card-wrap">
+      <a class="dest-card" href="{% url 'destination' sc.city.slug %}">
+        <div class="dest-card-img-placeholder">{{ sc.city.emoji }}</div>
+        <div class="dest-card-body">
+          <div class="dest-card-name">{{ sc.city.name }}</div>
+          <div class="dest-card-meta">
+            {{ sc.city.country.get_region_display }} · {{ sc.city.budget_symbol }}
+          </div>
+          <div class="dest-card-footer">
+            <span class="score-badge">{{ sc.score }}/100</span>
+            <span class="tag-pill tag-cultural">{{ sc.city.get_primary_category_display }}</span>
+          </div>
         </div>
-        <div class="dest-card-footer">
-          <span class="score-badge">{{ sc.score }}/100</span>
-          <span class="tag-pill tag-cultural">{{ sc.city.get_primary_category_display }}</span>
-        </div>
-      </div>
-    </a>
+      </a>
+      <button class="trip-save-btn"
+              data-destination="{{ sc.city.slug }}"
+              data-title="{{ sc.city.name }}"
+              onclick="saveTrip(this)"
+              title="Save to trips">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M17 3H7a2 2 0 0 0-2 2v16l7-3 7 3V5a2 2 0 0 0-2-2z"/></svg>
+      </button>
+    </div>
     {% empty %}
       <p style="color:#6B8A99;">No destinations match those filters.</p>
     {% endfor %}
   </div>
+
+  {% if user.is_authenticated %}
+  <script>
+  const _CSRF = (document.cookie.match(/csrftoken=([^;]+)/) || [])[1] || '';
+  async function saveTrip(btn) {
+    if (btn.classList.contains('saving')) return;
+    btn.classList.add('saving');
+    if (btn.classList.contains('saved')) {
+      btn.classList.remove('saved');
+      btn.classList.remove('saving');
+      return;
+    }
+    const res = await fetch('/api/trips/save/', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json', 'X-CSRFToken': _CSRF},
+      body: JSON.stringify({destination: btn.dataset.destination, title: btn.dataset.title}),
+    });
+    btn.classList.remove('saving');
+    if (res.ok) {
+      const data = await res.json();
+      btn.classList.add('saved');
+      btn.dataset.tripId = data.id;
+    }
+  }
+  </script>
+  {% else %}
+  <script>
+  function saveTrip() {
+    window.location.href = '/accounts/login/?next=' + encodeURIComponent(window.location.pathname);
+  }
+  </script>
+  {% endif %}
 </div>
 {% endblock %}

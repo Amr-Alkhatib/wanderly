@@ -5,7 +5,7 @@ from django.contrib import admin
 from django.contrib.auth import views as auth_views
 from django.urls import include, path
 
-from web import views_auth
+from web import views_auth, views_trips
 
 urlpatterns = [
     path("admin/", admin.site.urls),
@@ -13,6 +13,11 @@ urlpatterns = [
     path("accounts/login/", views_auth.login_view, name="login"),
     path("accounts/logout/", views_auth.logout_view, name="logout"),
     path("accounts/account/", views_auth.account, name="account"),
+    # Trip API endpoints (JSON)
+    path("api/trips/save/", views_trips.save_trip, name="api_save_trip"),
+    path("api/trips/<str:trip_id>/unsave/", views_trips.unsave_trip, name="api_unsave_trip"),
+    path("api/trips/<str:trip_id>/complete/", views_trips.complete_trip, name="api_complete_trip"),
+    path("api/profile/", views_trips.profile_api, name="api_profile"),
     path("accounts/password-reset/",
          auth_views.PasswordResetView.as_view(template_name="auth/password_reset.html"),
          name="password_reset"),

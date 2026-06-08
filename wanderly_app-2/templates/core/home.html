@@ -42,35 +42,79 @@
 
     <div class="featured-grid">
       {% for sc in featured %}
-      <a class="dest-card" href="{% url 'destination' sc.city.slug %}">
-        <div class="dest-card-img">
-          <img src="{% static 'images/dest/' %}{{ sc.city.image_file }}"
-               alt="{{ sc.city.country.name }}"
-               onerror="this.parentNode.classList.add('img-fallback');this.remove();" />
-          <span class="img-fallback-glyph">{{ sc.city.emoji }}</span>
-        </div>
-        <div class="dest-card-body">
-          <div class="dest-card-name">{{ sc.city.country.name }}</div>
-          <div class="dest-card-meta">
-            {{ sc.city.country.get_region_display }}{% if sc.city.safety_label %} · {{ sc.city.safety_label }}{% endif %} · {{ sc.city.budget_symbol }}
+      <div class="dest-card-wrap">
+        <a class="dest-card" href="{% url 'destination' sc.city.slug %}">
+          <div class="dest-card-img">
+            <img src="{% static 'images/dest/' %}{{ sc.city.image_file }}"
+                 alt="{{ sc.city.country.name }}"
+                 onerror="this.parentNode.classList.add('img-fallback');this.remove();" />
+            <span class="img-fallback-glyph">{{ sc.city.emoji }}</span>
           </div>
-          <div class="dest-card-tags">
-            <span class="score-badge" title="{{ sc.explain }}">{{ sc.score }}/100 <span class="score-info">ⓘ</span></span>
-            {% if sc.city.card_pill %}
-              <span class="pill pill-soft">{{ sc.city.card_pill }}</span>
-            {% endif %}
-            {% if sc.city.get_primary_category_display != sc.city.card_pill %}
-              <span class="pill pill-soft">{{ sc.city.get_primary_category_display }}</span>
-            {% endif %}
+          <div class="dest-card-body">
+            <div class="dest-card-name">{{ sc.city.country.name }}</div>
+            <div class="dest-card-meta">
+              {{ sc.city.country.get_region_display }}{% if sc.city.safety_label %} · {{ sc.city.safety_label }}{% endif %} · {{ sc.city.budget_symbol }}
+            </div>
+            <div class="dest-card-tags">
+              <span class="score-badge" title="{{ sc.explain }}">{{ sc.score }}/100 <span class="score-info">ⓘ</span></span>
+              {% if sc.city.card_pill %}
+                <span class="pill pill-soft">{{ sc.city.card_pill }}</span>
+              {% endif %}
+              {% if sc.city.get_primary_category_display != sc.city.card_pill %}
+                <span class="pill pill-soft">{{ sc.city.get_primary_category_display }}</span>
+              {% endif %}
+            </div>
           </div>
-        </div>
-      </a>
+        </a>
+        <button class="trip-save-btn"
+                data-destination="{{ sc.city.slug }}"
+                data-title="{{ sc.city.name }}"
+                onclick="saveTrip(this)"
+                title="Save to trips">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M17 3H7a2 2 0 0 0-2 2v16l7-3 7 3V5a2 2 0 0 0-2-2z"/></svg>
+        </button>
+      </div>
       {% empty %}
         <p class="empty-note">No featured destinations yet. Run
           <code>python manage.py seed_demo</code> to populate the demo data.</p>
       {% endfor %}
     </div>
   </section>
+
+  {% if user.is_authenticated %}
+  <script>
+  const _CSRF = (document.cookie.match(/csrftoken=([^;]+)/) || [])[1] || '';
+  async function saveTrip(btn) {
+    if (btn.classList.contains('saving')) return;
+    btn.classList.add('saving');
+    const destination = btn.dataset.destination;
+    const title = btn.dataset.title;
+    if (btn.classList.contains('saved')) {
+      btn.classList.remove('saved');
+      btn.classList.remove('saving');
+      return;
+    }
+    const res = await fetch('/api/trips/save/', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json', 'X-CSRFToken': _CSRF},
+      body: JSON.stringify({destination, title}),
+    });
+    btn.classList.remove('saving');
+    if (res.ok) {
+      const data = await res.json();
+      btn.classList.add('saved');
+      btn.dataset.tripId = data.id;
+      btn.title = 'Saved! Click to view';
+    }
+  }
+  </script>
+  {% else %}
+  <script>
+  function saveTrip() {
+    window.location.href = '/accounts/login/?next=' + encodeURIComponent(window.location.pathname);
+  }
+  </script>
+  {% endif %}
 
   <!-- ===== Top Picks + Plan by Category ===== -->
   <div class="discover-cols">

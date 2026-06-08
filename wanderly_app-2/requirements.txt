@@ -10,6 +10,9 @@ psycopg[binary]==3.2.3
 gunicorn==23.0.0
 whitenoise==6.8.2
 
+# Supabase integration
+supabase>=2.10.0
+
 # --- Planned next-step dependencies (left commented until wired in) ---
 # praw==7.8.1            # Reddit ingestion (ReviewSource)
 # transformers==4.46.0  # ABSA model inference

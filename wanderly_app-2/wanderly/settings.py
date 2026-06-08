@@ -229,3 +229,16 @@ if not DEBUG:
 WANDERLY_EXPLAINER_BACKEND = os.environ.get(
     "WANDERLY_EXPLAINER_BACKEND", "intelligence.explainers.NullExplainer"
 )
+
+
+# --- Supabase integration ----------------------------------------------------
+#
+# SUPABASE_URL and SUPABASE_ANON_KEY are safe to expose to the frontend.
+# SUPABASE_SERVICE_KEY has full DB access and must NEVER leave the backend.
+
+SUPABASE_URL = os.environ.get("SUPABASE_URL", "https://wnvacqanqusuaixvjuqf.supabase.co")
+SUPABASE_ANON_KEY = os.environ.get(
+    "SUPABASE_ANON_KEY",
+    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndudmFjcWFucXVzdWFpeHZqdXFmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA5MjgzNDcsImV4cCI6MjA5NjUwNDM0N30.oUsymMqK5bl7GOSpVwEjICF5gMgdtJRfzery2WLjIxE",
+)
+SUPABASE_SERVICE_KEY = os.environ.get("SUPABASE_SERVICE_KEY", "")
