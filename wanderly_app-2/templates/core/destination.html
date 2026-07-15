@@ -570,7 +570,11 @@
     {% else %}
       <div class="cp-placeholder-state">
         <div class="cp-placeholder-icon">🗓️</div>
-        <p>Click a day length above for an AI-planned day-by-day trip.</p>
+        {% if itinerary_error %}
+          <p style="color:#dc2626;">{{ itinerary_error }}</p>
+        {% else %}
+          <p>Click a day length above for an AI-planned day-by-day trip.</p>
+        {% endif %}
       </div>
     {% endif %}
       </div>
@@ -618,9 +622,6 @@ document.querySelectorAll('.itin-daytab').forEach(function (t) {
     document.getElementById('itin-loading').classList.add('show');
   });
 });
-if (new URLSearchParams(location.search).get('itinerary')) {
-  document.querySelector('[data-target="tab-itinerary"]')?.click();
-}
 </script>
 
 
@@ -648,6 +649,14 @@ if (new URLSearchParams(location.search).get('itinerary')) {
       document.getElementById(this.dataset.target).classList.add('active');
     });
   });
+
+  // Restore the Itinerary tab after a ?itinerary=1 reload.
+  // Must run here, AFTER the click listeners above are attached —
+  // otherwise the page falls back to the default Overview tab.
+  if (new URLSearchParams(location.search).get('itinerary')) {
+    var itinTab = document.querySelector('[data-target="tab-itinerary"]');
+    if (itinTab) itinTab.click();
+  }
 
   var pills = document.querySelectorAll('.lt-filter-pill');
 

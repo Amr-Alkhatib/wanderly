@@ -288,6 +288,41 @@ def destination(request: HttpRequest, slug: str) -> HttpResponse:
     from web.views_saved import get_saved_trip_map
     saved_trip_map = get_saved_trip_map(request.user)
 
+    # --- AI itinerary (only when explicitly requested via ?itinerary=1) ---
+    itinerary = None
+    trip_summary = None
+    itinerary_error = None
+    try:
+        itinerary_days = int(request.GET.get("days", 3))
+    except (TypeError, ValueError):
+        itinerary_days = 3
+    itinerary_days = max(1, min(10, itinerary_days))
+
+    if request.GET.get("itinerary"):
+        from intelligence.itinerary import build_itinerary
+        itinerary = build_itinerary(city, itinerary_days)
+        if itinerary:
+            total_cost = sum(
+                d.morning_cost + d.afternoon_cost + d.evening_cost for d in itinerary
+            )
+            activity_count = sum(
+                1 for d in itinerary
+                for a in (d.morning, d.afternoon, d.evening) if a
+            )
+            trip_summary = {
+                "days": len(itinerary),
+                "activities": activity_count,
+                "total_cost": total_cost,
+            }
+            if latest_cost:
+                trip_summary["budget_low"] = latest_cost.daily_budget_eur * itinerary_days
+                trip_summary["budget_high"] = latest_cost.daily_midrange_eur * itinerary_days
+        else:
+            itinerary = None
+            itinerary_error = (
+                "Couldn't generate an itinerary right now — please try again."
+            )
+
     context = {
         "saved_trip_map_json": json.dumps(saved_trip_map),
         "city": city,
@@ -301,6 +336,10 @@ def destination(request: HttpRequest, slug: str) -> HttpResponse:
         "neighborhoods": _NEIGHBORHOODS.get(slug, []),
         "transport": _TRANSPORT.get(slug, _DEFAULT_TRANSPORT),
         "emergency": _EMERGENCY.get(slug, _DEFAULT_EMERGENCY),
+        "itinerary": itinerary,
+        "itinerary_days": itinerary_days,
+        "trip_summary": trip_summary,
+        "itinerary_error": itinerary_error,
     }
     return render(request, "core/destination.html", context)
 
