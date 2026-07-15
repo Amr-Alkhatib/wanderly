@@ -8,7 +8,7 @@
 
   <h1 style="font-size: 26px; font-weight: 800; margin-bottom: 24px;">Explore Destinations</h1>
 
-  <!-- Filters (GET so results are shareable/bookmarkable) -->
+  <!-- Filters -->
   <form method="get" class="filters-bar">
     <div class="filter-group" style="flex: 2; min-width: 200px;">
       <label>Search</label>
@@ -52,17 +52,22 @@
     {% for sc in results %}
     <div class="dest-card-wrap">
       <a class="dest-card" href="{% url 'destination' sc.city.slug %}">
-        <div class="dest-card-img-placeholder">{{ sc.city.emoji }}</div>
-        <div class="dest-card-body">
-          <div class="dest-card-name">{{ sc.city.name }}</div>
-          <div class="dest-card-meta">
-            {{ sc.city.country.get_region_display }} · {{ sc.city.budget_symbol }}
-          </div>
-          <div class="dest-card-footer">
-            <span class="score-badge">{{ sc.score }}/100</span>
-            <span class="tag-pill tag-cultural">{{ sc.city.get_primary_category_display }}</span>
-          </div>
+      <div class="dest-card-img">
+        <img src="{% static 'images/dest/' %}{{ sc.city.image_file }}"
+             alt="{{ sc.city.name }}"
+             onerror="this.parentNode.classList.add('img-fallback');this.remove();" />
+        <span class="img-fallback-glyph">{{ sc.city.emoji }}</span>
+      </div>
+      <div class="dest-card-body">
+        <div class="dest-card-name">{{ sc.city.name }}</div>
+        <div class="dest-card-meta">
+          {{ sc.city.country.get_region_display }}{% if sc.city.safety_label %} · {{ sc.city.safety_label }}{% endif %} · {{ sc.city.budget_symbol }}
         </div>
+        <div class="dest-card-tags">
+          <span class="score-badge" title="{{ sc.explain }}">{{ sc.score }}/100</span>
+          <span class="pill pill-soft">{{ sc.city.get_primary_category_display }}</span>
+        </div>
+      </div>
       </a>
       <button class="trip-save-btn"
               data-destination="{{ sc.city.slug }}"
@@ -76,6 +81,7 @@
       <p style="color:#6B8A99;">No destinations match those filters.</p>
     {% endfor %}
   </div>
+</div>
 
   {% if user.is_authenticated %}
   <script>
@@ -152,5 +158,5 @@
   }
   </script>
   {% endif %}
-</div>
+
 {% endblock %}

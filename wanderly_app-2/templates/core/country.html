@@ -1,0 +1,159 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}{{ country.name }} · Wanderly{% endblock %}
+
+{% block content %}
+
+<!-- HERO -->
+<div class="cp-hero">
+  <div class="cp-hero-inner">
+    <div class="cp-hero-left">
+      <div class="cp-breadcrumb">
+        <a href="{% url 'home' %}">Discover</a> &rsaquo;
+        <a href="{% url 'search' %}?region={{ country.region }}">{{ country.get_region_display }}</a> &rsaquo;
+        <span>{{ country.name }}</span>
+      </div>
+      <h1 class="cp-title">{{ country.name }}</h1>
+      {% if anchor %}<p class="cp-subtitle">{{ anchor.summary }}</p>{% endif %}
+    </div>
+    <div class="cp-hero-stats">
+      {% if latest_safety %}
+      <div class="cp-stat-card">
+        <div class="cp-stat-label">Safety Score</div>
+        <div class="cp-stat-value cp-stat-green">{{ latest_safety.safety_score }}/100</div>
+        <div class="cp-stat-sub">{{ latest_safety.get_level_display }}</div>
+      </div>
+      {% endif %}
+      {% if latest_cost %}
+      <div class="cp-stat-card">
+        <div class="cp-stat-label">Budget From</div>
+        <div class="cp-stat-value cp-stat-orange">€{{ latest_cost.daily_budget_eur }}</div>
+        <div class="cp-stat-sub">per day</div>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+<!-- INFO BAR -->
+<div class="cp-infobar">
+  <div class="cp-info-card cp-info-orange">
+    <div class="cp-info-label">Language</div>
+    <div class="cp-info-value">{{ country.language }}</div>
+  </div>
+  <div class="cp-info-card cp-info-green">
+    <div class="cp-info-label">Currency</div>
+    <div class="cp-info-value">{{ country.currency }}</div>
+  </div>
+  <div class="cp-info-card cp-info-blue">
+    <div class="cp-info-label">Visa</div>
+    <div class="cp-info-value">{{ country.visa_summary }}</div>
+  </div>
+  <div class="cp-info-card cp-info-yellow">
+    <div class="cp-info-label">Region</div>
+    <div class="cp-info-value">{{ country.get_region_display }}</div>
+  </div>
+</div>
+
+
+<div class="cp-body">
+
+  <div class="cp-main">
+
+    <!-- At a Glance -->
+    <div class="cp-section">
+      <h2 class="cp-section-title">At a Glance</h2>
+      {% if latest_safety %}
+      <div class="cp-bar-row">
+        <span class="cp-bar-label">Safety Score</span>
+        <div class="cp-bar-track">
+          <div class="cp-bar-fill cp-bar-green" style="width: {{ latest_safety.safety_score }}%"></div>
+        </div>
+        <span class="cp-bar-pct">{{ latest_safety.safety_score }}%</span>
+      </div>
+      {% endif %}
+      {% if latest_cost and scored %}
+      <div class="cp-bar-row">
+        <span class="cp-bar-label">Cost Level</span>
+        <div class="cp-bar-track">
+          <div class="cp-bar-fill cp-bar-orange" style="width: {{ scored.score }}%"></div>
+        </div>
+        <span class="cp-bar-pct">{{ scored.score }}%</span>
+      </div>
+      {% endif %}
+      {% if scored %}
+      <div class="cp-bar-row">
+        <span class="cp-bar-label">Wanderly Score</span>
+        <div class="cp-bar-track">
+          <div class="cp-bar-fill cp-bar-navy" style="width: {{ scored.score }}%"></div>
+        </div>
+        <span class="cp-bar-pct">{{ scored.score }}%</span>
+      </div>
+      {% endif %}
+    </div>
+
+    <!-- Best Time to Visit -->
+    {% if weather %}
+    <div class="cp-section">
+      <h2 class="cp-section-title">Best Time to Visit</h2>
+      <div class="cp-months">
+        {% for w in weather %}
+        <div class="cp-month {% if w.is_recommended_month %}cp-month-active{% endif %}">
+          {% if w.month == 1 %}J{% elif w.month == 2 %}F{% elif w.month == 3 %}M
+          {% elif w.month == 4 %}A{% elif w.month == 5 %}M{% elif w.month == 6 %}J
+          {% elif w.month == 7 %}J{% elif w.month == 8 %}A{% elif w.month == 9 %}S
+          {% elif w.month == 10 %}O{% elif w.month == 11 %}N{% elif w.month == 12 %}D{% endif %}
+        </div>
+        {% endfor %}
+      </div>
+      {% for w in weather %}
+        {% if w.climate_type and forloop.first %}
+        <p class="cp-climate-note">Climate: {{ w.get_climate_type_display }}</p>
+        {% endif %}
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    <!-- Description -->
+    {% if anchor %}
+    <div class="cp-section">
+      <p class="cp-desc">{{ anchor.summary }}</p>
+    </div>
+    {% endif %}
+
+  </div>
+
+  <div class="cp-sidebar">
+
+    <div class="cp-sidebar-card">
+      <h3 class="cp-sidebar-title">Regions &amp; Cities</h3>
+      {% for c in cities %}
+      <a class="cp-city-row" href="{% url 'destination' c.slug %}">
+        <span>{{ c.name }}</span>
+        <span class="cp-city-arrow">&rarr;</span>
+      </a>
+      {% endfor %}
+    </div>
+
+    <div class="cp-sidebar-card">
+      <h3 class="cp-sidebar-title">Practical Info</h3>
+      <p class="cp-practical-row">Visa: {{ country.visa_summary }}</p>
+      <p class="cp-practical-row">Currency: {{ country.currency }}</p>
+      {% if latest_safety %}
+      <p class="cp-practical-row">Health: {{ latest_safety.health_notes }}</p>
+      {% endif %}
+    </div>
+
+    <a href="{% url 'search' %}?region={{ country.region }}" class="cp-cta-btn">
+      Plan a Trip to {{ country.name }}
+    </a>
+    <a href="{% url 'compare' %}" class="cp-cta-btn cp-cta-outline">
+      Compare Destination
+    </a>
+
+  </div>
+
+</div><
+
+{% endblock %}

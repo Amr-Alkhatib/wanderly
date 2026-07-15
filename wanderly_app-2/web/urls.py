@@ -10,6 +10,7 @@ from .views_saved import saved
 urlpatterns = [
     path("", views.home, name="home"),
     path("search/", views.search, name="search"),
+    path("country/<slug:slug>/", views.country_profile, name="country_profile"),
     path("destination/<slug:slug>/", views.destination, name="destination"),
     path("compare/", views.compare, name="compare"),
     path("saved/", saved, name="saved"),

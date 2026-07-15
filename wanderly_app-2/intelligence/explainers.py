@@ -12,15 +12,17 @@ LLM is switched off, swapped, or unavailable.
 so choosing a vendor (Gemini, Groq, ...) is a one-line config change, not a
 code change. The default `NullExplainer` needs no network and no API key.
 """
-
 from __future__ import annotations
 
 import abc
+import logging
 from importlib import import_module
 
 from django.conf import settings
 
 from .engine import ScoredCity
+
+logger = logging.getLogger(__name__)
 
 
 class Explainer(abc.ABC):
@@ -90,7 +92,27 @@ class LLMExplainerBase(Explainer):
             text = self._complete(self._build_prompt(scored)).strip()
             return text or NullExplainer().explain(scored)
         except Exception:  # noqa: BLE001 -- graceful degradation is the point
+            logger.exception(
+                "LLM explainer %s failed; falling back to NullExplainer",
+                type(self).__name__,
+            )
             return NullExplainer().explain(scored)
+
+
+class GeminiExplainer(LLMExplainerBase):
+
+    MODEL = "gemini-2.5-flash"
+
+    def _complete(self, prompt: str) -> str:
+        import os
+        from google import genai  # type: ignore[import]
+
+        api_key = os.environ.get("GEMINI_API_KEY", "")
+        if not api_key:
+            raise ValueError("GEMINI_API_KEY not set")
+        client = genai.Client(api_key=api_key)
+        response = client.models.generate_content(model=self.MODEL, contents=prompt)
+        return response.text
 
 
 def get_explainer() -> Explainer:
@@ -109,4 +131,8 @@ def get_explainer() -> Explainer:
         explainer_cls = getattr(module, class_name)
         return explainer_cls()
     except (ImportError, AttributeError, TypeError):
+        logger.exception(
+            "Could not load explainer backend %r; falling back to NullExplainer",
+            path,
+        )
         return NullExplainer()

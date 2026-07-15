@@ -1,236 +1,674 @@
 {% extends "base.html" %}
 {% load static %}
 
-{% block title %}{{ city.name }} · Wanderly{% endblock %}
+{% block title %}{{ city.country.name }} · Wanderly{% endblock %}
 
 {% block content %}
-<div class="container" style="padding-top: 32px;">
 
-  <!-- Hero -->
-  <div class="dest-hero">
-    <div class="dest-hero-emoji">{{ city.emoji }}</div>
-    <div class="dest-hero-overlay">
-      <div style="display: flex; gap: 8px; margin-bottom: 8px;">
-        <span class="tag-pill" style="background: rgba(232,98,58,0.25); color: var(--orange);">{{ city.country.get_region_display }}</span>
-        <span class="tag-pill" style="background: rgba(232,98,58,0.25); color: var(--orange);">{{ city.get_primary_category_display }}</span>
+<!-- HERO -->
+<div class="cp-hero">
+  <div class="cp-hero-inner">
+    <div class="cp-hero-left">
+      <div class="cp-breadcrumb">
+        <a href="{% url 'home' %}">Discover</a> &rsaquo;
+        <a href="{% url 'search' %}?region={{ city.country.region }}">{{ city.country.get_region_display }}</a> &rsaquo;
+        <a href="{% url 'country_profile' city.country.slug %}">{{ city.country.name }}</a> &rsaquo;
+        <span>{{ city.name }}</span>
       </div>
-      <h1>{{ city.name }}</h1>
-      <div class="dest-hero-meta">{{ city.country.name }} · {{ city.country.language }}</div>
+      <h1 class="cp-title">{{ city.name }}</h1>
+      <p class="cp-subtitle">{{ city.country.name }} &middot; {{ city.summary }}</p>
+      <div style="margin-top:14px;">
+        <button id="destSaveBtn"
+                class="trip-save-btn dest-save-btn-inline"
+                data-destination="{{ city.slug }}"
+                data-title="{{ city.name }}"
+                onclick="saveDestTrip(this)"
+                title="Save to trips">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M17 3H7a2 2 0 0 0-2 2v16l7-3 7 3V5a2 2 0 0 0-2-2z"/></svg>
+          <span id="destSaveBtnLabel">Save</span>
+        </button>
+      </div>
     </div>
-    <div class="dest-score">
-      <span class="dest-score-num">{{ scored.score }}</span>
-      <span class="dest-score-label">/ 100</span>
+    <div class="cp-hero-stats">
+      {% if latest_safety %}
+      <div class="cp-stat-card">
+        <div class="cp-stat-label">Safety Score</div>
+        <div class="cp-stat-value cp-stat-green">{{ latest_safety.safety_score }}/100</div>
+        <div class="cp-stat-sub">{{ latest_safety.get_level_display }}</div>
+      </div>
+      {% endif %}
+      {% if latest_cost %}
+      <div class="cp-stat-card">
+        <div class="cp-stat-label">Cost Level</div>
+        <div class="cp-stat-value cp-stat-orange">{{ city.budget_symbol }}</div>
+        <div class="cp-stat-sub">~€{{ latest_cost.daily_budget_eur }}–{{ latest_cost.daily_midrange_eur }}/day</div>
+      </div>
+      {% endif %}
     </div>
   </div>
+</div>
 
-  <!-- Action bar -->
-  <div style="display: flex; gap: 12px; margin-bottom: 24px; flex-wrap: wrap; align-items: center;">
-    <a href="{% url 'compare' %}?city={{ city.slug }}" class="btn-primary">⚖️ Compare</a>
-    <a href="{% url 'search' %}?region={{ city.country.region }}" style="background: rgba(0,0,0,0.07); color: #3A5A6A; padding: 10px 20px; border-radius: 8px; font-size: 14px; font-weight: 600;">More from {{ city.country.get_region_display }}</a>
-    <button id="destSaveBtn"
-            class="trip-save-btn dest-save-btn-inline"
-            data-destination="{{ city.slug }}"
-            data-title="{{ city.name }}"
-            onclick="saveDestTrip(this)"
-            title="Save to trips">
-      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M17 3H7a2 2 0 0 0-2 2v16l7-3 7 3V5a2 2 0 0 0-2-2z"/></svg>
-      <span id="destSaveBtnLabel">Save</span>
-    </button>
+<!-- INFO BAR -->
+<div class="cp-infobar">
+  <div class="cp-info-card cp-info-orange">
+    <div class="cp-info-label">Language</div>
+    <div class="cp-info-value">{{ city.country.language }}</div>
   </div>
+  <div class="cp-info-card cp-info-green">
+    <div class="cp-info-label">Currency</div>
+    <div class="cp-info-value">{{ city.country.currency }}</div>
+  </div>
+  <div class="cp-info-card cp-info-blue">
+    <div class="cp-info-label">Visa</div>
+    <div class="cp-info-value">{{ city.country.visa_summary|truncatechars:20 }}</div>
+  </div>
+  <div class="cp-info-card cp-info-yellow">
+    <div class="cp-info-label">Budget Tier</div>
+    <div class="cp-info-value">{{ city.get_budget_tier_display }}</div>
+  </div>
+</div>
 
-  {% if user.is_authenticated %}
-  <script>
-  const _DEST_CSRF = document.querySelector('meta[name="csrf-token"]')?.content || '';
-  const _DEST_SAVED_MAP = {{ saved_trip_map_json }};
+<!-- TAB BAR -->
+<div class="cp-tab-bar-wrapper">
+  <div class="cp-tab-bar">
+    <button class="cp-tab active" data-target="tab-overview">Overview</button>
+    <button class="cp-tab" data-target="tab-cost">Cost &amp; Budget</button>
+    <button class="cp-tab" data-target="tab-safety">Safety &amp; Practical Info</button>
+    <button class="cp-tab" data-target="tab-local-tips">Local Tips</button>
+    <button class="cp-tab" data-target="tab-itinerary">Itinerary</button>
+    <button class="cp-tab" data-target="tab-transport">Transport</button>
+  </div>
+</div>
 
-  (function initDestBtn() {
-    const btn = document.getElementById('destSaveBtn');
-    const slug = btn && btn.dataset.destination;
-    if (slug && _DEST_SAVED_MAP[slug]) {
-      btn.classList.add('saved');
-      btn.dataset.tripId = _DEST_SAVED_MAP[slug];
-      document.getElementById('destSaveBtnLabel').textContent = 'Saved';
-    }
-  })();
 
-  async function saveDestTrip(btn) {
-    if (btn.classList.contains('saving')) return;
-    btn.classList.add('saving');
-    const destination = btn.dataset.destination;
-    const title = btn.dataset.title;
-    const label = document.getElementById('destSaveBtnLabel');
 
-    if (btn.classList.contains('saved')) {
-      const tripId = btn.dataset.tripId;
-      if (!tripId) { btn.classList.remove('saving'); return; }
-      try {
-        const res = await fetch(`/api/trips/${tripId}/unsave/`, {
-          method: 'POST',
-          headers: {'X-CSRFToken': _DEST_CSRF},
-        });
-        if (res.ok) {
-          btn.classList.remove('saved');
-          btn.dataset.tripId = '';
-          label.textContent = 'Save';
-          delete _DEST_SAVED_MAP[destination];
+<!-- OVERVIEW -->
+<div class="cp-tab-panel active" id="tab-overview">
+  <div class="cp-body">
+
+    <div class="cp-main">
+
+      <!-- At a Glance -->
+      <div class="cp-section">
+        <h2 class="cp-section-title">At a Glance</h2>
+        {% if latest_safety %}
+        <div class="cp-bar-row">
+          <span class="cp-bar-label">Safety Score</span>
+          <div class="cp-bar-track">
+            <div class="cp-bar-fill cp-bar-green" style="width: {{ latest_safety.safety_score }}%"></div>
+          </div>
+          <span class="cp-bar-pct">{{ latest_safety.safety_score }}%</span>
+        </div>
+        {% endif %}
+        {% if latest_cost %}
+        <div class="cp-bar-row">
+          <span class="cp-bar-label">Cost Level</span>
+          <div class="cp-bar-track">
+            <div class="cp-bar-fill cp-bar-orange" style="width: {{ scored.score }}%"></div>
+          </div>
+          <span class="cp-bar-pct">{{ scored.score }}%</span>
+        </div>
+        {% endif %}
+        <div class="cp-bar-row">
+          <span class="cp-bar-label">Wanderly Score</span>
+          <div class="cp-bar-track">
+            <div class="cp-bar-fill cp-bar-navy" style="width: {{ scored.score }}%"></div>
+          </div>
+          <span class="cp-bar-pct">{{ scored.score }}%</span>
+        </div>
+      </div>
+
+      <!-- Why this score? -->
+      {% if why %}
+      <div class="cp-section cp-why-section">
+        <h2 class="cp-section-title">✦ Why this score?</h2>
+        <p class="cp-why-text">{{ why }}</p>
+      </div>
+      {% endif %}
+
+      <!-- Best Time to Visit -->
+      <div class="cp-section">
+        <h2 class="cp-section-title">Best Time to Visit</h2>
+        <div class="cp-months">
+          {% for w in weather %}
+          <div class="cp-month {% if w.is_recommended_month %}cp-month-active{% endif %}">
+            {% if w.month == 1 %}J{% elif w.month == 2 %}F{% elif w.month == 3 %}M{% elif w.month == 4 %}A{% elif w.month == 5 %}M{% elif w.month == 6 %}J{% elif w.month == 7 %}J{% elif w.month == 8 %}A{% elif w.month == 9 %}S{% elif w.month == 10 %}O{% elif w.month == 11 %}N{% elif w.month == 12 %}D{% endif %}
+          </div>
+          {% endfor %}
+        </div>
+        {% for w in weather %}
+          {% if w.climate_type and forloop.first %}
+          <p class="cp-climate-note">Climate: {{ w.climate_type }}</p>
+          {% endif %}
+        {% endfor %}
+      </div>
+
+      <!-- Description -->
+      <div class="cp-section">
+        <p class="cp-desc">{{ city.summary }}</p>
+      </div>
+
+    </div><!-- /.cp-main -->
+
+    <div class="cp-sidebar">
+
+
+      {% if neighborhoods %}
+      <div class="cp-sidebar-card">
+        <h3 class="cp-sidebar-title">Neighborhoods</h3>
+        <div class="cp-neighborhood-list">
+          {% for n in neighborhoods %}
+          <span class="cp-neighborhood-pill">{{ n }}</span>
+          {% endfor %}
+        </div>
+      </div>
+      {% endif %}
+
+
+      <div class="cp-sidebar-card">
+        <h3 class="cp-sidebar-title">Transport Overview</h3>
+        <ul class="cp-transport-list">
+          {% for t in transport %}
+          <li class="cp-transport-row">{{ t }}</li>
+          {% endfor %}
+        </ul>
+      </div>
+
+
+      <div class="cp-sidebar-card">
+        <h3 class="cp-sidebar-title">Practical Info</h3>
+        <div class="cp-practical-table">
+          <div class="cp-practical-row"><span class="cp-practical-label">Visa</span><span class="cp-practical-val">{{ city.country.visa_summary }}</span></div>
+          <div class="cp-practical-row"><span class="cp-practical-label">Currency</span><span class="cp-practical-val">{{ city.country.currency }}</span></div>
+          <div class="cp-practical-row"><span class="cp-practical-label">Language</span><span class="cp-practical-val">{{ city.country.language }}</span></div>
+          <div class="cp-practical-row"><span class="cp-practical-label">Budget</span><span class="cp-practical-val">{{ city.budget_symbol }} · {{ city.get_budget_tier_display }}</span></div>
+        </div>
+      </div>
+
+
+      {% if latest_safety %}
+      <div class="cp-sidebar-card">
+        <h3 class="cp-sidebar-title">Safety Notes</h3>
+        <div class="cp-safety-header">
+          <span class="cp-safety-score">{{ latest_safety.safety_score }}<span class="cp-safety-max">/100</span></span>
+          <span class="cp-safety-level {% if latest_safety.level == 3 %}cp-safety-safe{% elif latest_safety.level == 2 %}cp-safety-moderate{% else %}cp-safety-caution{% endif %}">{{ latest_safety.get_level_display }}</span>
+        </div>
+        {% if latest_safety.advisory_summary %}
+        <p class="cp-safety-note">{{ latest_safety.advisory_summary }}</p>
+        {% endif %}
+        {% if latest_safety.health_notes %}
+        <p class="cp-safety-note">{{ latest_safety.health_notes }}</p>
+        {% endif %}
+      </div>
+      {% endif %}
+
+      
+      <a href="{% url 'search' %}?region={{ city.country.region }}" class="cp-cta-btn">
+        Plan a Trip to {{ city.country.name }}
+      </a>
+      <a href="#" class="cp-cta-btn cp-cta-outline">
+        Save Destination
+      </a>
+
+    </div>
+
+  </div>
+</div>
+
+<!-- COST & BUDGET -->
+<div class="cp-tab-panel" id="tab-cost">
+  <div class="cp-panel-inner">
+    <div class="cp-body">
+      <div class="cp-main">
+        {% if latest_cost %}
+        <div class="cp-section">
+          <h2 class="cp-section-title">Daily Budget</h2>
+          <div class="info-row"><span class="info-row-label">Budget traveller</span><span class="info-row-value" style="color:#2EB85C;">€{{ latest_cost.daily_budget_eur }}/day</span></div>
+          <div class="info-row"><span class="info-row-label">Mid-range</span><span class="info-row-value" style="color:#f0a500;" >€{{ latest_cost.daily_midrange_eur }}/day</span></div>
+          <div class="info-row"><span class="info-row-label">Luxury</span><span class="info-row-value" style="color:#3380b2;" >€{{ latest_cost.daily_luxury_eur }}/day</span></div>
+        </div>
+        <div class="cp-section">
+          <h2 class="cp-section-title">Typical Costs</h2>
+          <div class="info-row"><span class="info-row-label">Hostel / dorm night</span><span class="info-row-value">€{{ latest_cost.hostel_night_eur }}</span></div>
+          <div class="info-row"><span class="info-row-label">Cheap meal</span><span class="info-row-value">€{{ latest_cost.meal_cheap_eur }}</span></div>
+          <div class="info-row"><span class="info-row-label">Local transport / day</span><span class="info-row-value">€{{ latest_cost.local_transport_day_eur }}</span></div>
+        </div>
+        {% else %}
+        <div class="cp-section"><p style="color: var(--muted);">No cost data available yet.</p></div>
+        {% endif %}
+      </div>
+      <div class="cp-sidebar">
+        <div class="cp-sidebar-card" style="background: #fff3ef; border: 1px solid var(--orange);">
+          <div style="color: var(--orange); font-weight: 700; font-size: 14px; margin-bottom: 8px;">✦ AI Trip Cost Calculator</div>
+          <p style="font-size: 13px; color: var(--muted); line-height: 1.6;">Personalised daily budget estimates based on your travel style — coming soon.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- SAFETY & PRACTICAL INFO -->
+<div class="cp-tab-panel" id="tab-safety">
+  <div class="cp-panel-inner">
+    <div class="sp-grid">
+
+      <div class="sp-col">
+
+        <div class="sp-card">
+          <h3 class="sp-card-title">Safety by Category</h3>
+          {% if latest_safety %}
+          <div class="sp-overall-row">
+            <span class="sp-overall-score">{{ latest_safety.safety_score }}</span>
+            <span class="sp-overall-label">/ 100 overall score</span>
+            <span class="cp-safety-level {% if latest_safety.level == 3 %}cp-safety-safe{% elif latest_safety.level == 2 %}cp-safety-moderate{% else %}cp-safety-caution{% endif %}">{{ latest_safety.get_level_display }}</span>
+          </div>
+          {% if latest_safety.advisory_summary %}
+          <p class="sp-advisory">{{ latest_safety.advisory_summary }}</p>
+          {% endif %}
+          {% endif %}
+          <div class="sp-cat-list">
+            <div class="sp-cat-row">
+              <span class="sp-cat-label">Personal Safety</span>
+              <span class="sp-cat-badge sp-badge-green">Low Risk</span>
+            </div>
+            <div class="sp-cat-row">
+              <span class="sp-cat-label">Natural Disasters</span>
+              <span class="sp-cat-badge sp-badge-yellow">Moderate</span>
+            </div>
+            <div class="sp-cat-row">
+              <span class="sp-cat-label">Health &amp; Medical</span>
+              <span class="sp-cat-badge sp-badge-green">Good</span>
+            </div>
+            <div class="sp-cat-row">
+              <span class="sp-cat-label">Transport Safety</span>
+              <span class="sp-cat-badge sp-badge-yellow">Moderate</span>
+            </div>
+            <div class="sp-cat-row">
+              <span class="sp-cat-label">Scams &amp; Petty Crime</span>
+              <span class="sp-cat-badge sp-badge-red">High Risk</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="sp-card">
+          <h3 class="sp-card-title">Health Information</h3>
+          {% if latest_safety and latest_safety.health_notes %}
+          <p class="sp-advisory">{{ latest_safety.health_notes }}</p>
+          {% endif %}
+          <div class="sp-health-table">
+            <div class="sp-health-row">
+              <span class="sp-health-label">Tap water</span>
+              <span class="sp-health-val sp-health-warn">Not safe to drink</span>
+            </div>
+            <div class="sp-health-row">
+              <span class="sp-health-label">Vaccines</span>
+              <span class="sp-health-val">Hep A, Typhoid</span>
+            </div>
+            <div class="sp-health-row">
+              <span class="sp-health-label">Healthcare quality</span>
+              <span class="sp-health-val">Moderate</span>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <div class="sp-col">
+        <div class="sp-card">
+          <h3 class="sp-card-title">Visa &amp; Entry</h3>
+          <div class="sp-visa-hero">
+            <span class="sp-visa-days">90</span>
+            <span class="sp-visa-days-label">days visa-free<br>(EU / US / UK — varies by passport)</span>
+          </div>
+          {% if city.country.visa_summary %}
+          <p class="sp-advisory">{{ city.country.visa_summary }}</p>
+          {% endif %}
+          <h4 class="sp-sub-title">Requirements checklist</h4>
+          <ul class="sp-visa-list">
+            <li class="sp-visa-item">
+              <span class="sp-dot sp-dot-green"></span>
+              <span>Valid passport (6+ months remaining)</span>
+            </li>
+            <li class="sp-visa-item">
+              <span class="sp-dot sp-dot-green"></span>
+              <span>Return or onward ticket</span>
+            </li>
+            <li class="sp-visa-item">
+              <span class="sp-dot sp-dot-yellow"></span>
+              <span>Proof of accommodation</span>
+            </li>
+            <li class="sp-visa-item">
+              <span class="sp-dot sp-dot-yellow"></span>
+              <span>Sufficient funds (approx. €50 / day)</span>
+            </li>
+            <li class="sp-visa-item">
+              <span class="sp-dot sp-dot-red"></span>
+              <span>Visa required for stays beyond 90 days</span>
+            </li>
+          </ul>
+          <div class="sp-map-placeholder">
+            <span class="sp-map-label">Visa-free access world map — coming soon</span>
+          </div>
+        </div>
+      </div>
+
+
+      <div class="sp-col">
+
+        <div class="sp-risk-card">
+          <h3 class="sp-card-title sp-risk-title">Legally Risky</h3>
+          <p class="sp-risk-sub">Things to avoid to stay out of trouble</p>
+          <ul class="sp-risk-list">
+            <li>Public intoxication in certain areas</li>
+            <li>Photographing government or military buildings</li>
+            <li>Jaywalking — fines apply in many cities</li>
+            <li>Carrying unmarked prescription medication</li>
+          </ul>
+        </div>
+
+        <div class="sp-tips-card">
+          <h3 class="sp-card-title sp-tips-title">Practical Tips</h3>
+          <ul class="sp-tips-list">
+            <li class="sp-tip-item">
+              <span class="sp-tick">&#10003;</span>
+              <span>Keep a photocopy of your passport</span>
+            </li>
+            <li class="sp-tip-item">
+              <span class="sp-tick">&#10003;</span>
+              <span>Register with your embassy for long stays</span>
+            </li>
+            <li class="sp-tip-item">
+              <span class="sp-tick">&#10003;</span>
+              <span>Use ATMs inside bank branches, not on the street</span>
+            </li>
+            <li class="sp-tip-item">
+              <span class="sp-tick">&#10003;</span>
+              <span>Travel insurance is strongly recommended</span>
+            </li>
+          </ul>
+        </div>
+
+        <div class="sp-emergency-card">
+          <h3 class="sp-emergency-title">Emergency Numbers</h3>
+          {% for service, number in emergency.items %}
+          <div class="sp-emergency-row">
+            <span class="sp-emergency-label">{{ service }}</span>
+            <span class="sp-emergency-num">{{ number }}</span>
+          </div>
+          {% endfor %}
+        </div>
+
+      </div>
+
+    </div>
+  </div>
+</div>
+
+
+<!-- LOCAL TIPS -->
+<div class="cp-tab-panel" id="tab-local-tips">
+  <div class="cp-panel-inner">
+
+    <!-- FILTER PILLS -->
+    <div class="lt-filter-bar">
+      <button class="lt-filter-pill active" data-filter="all">All</button>
+      <button class="lt-filter-pill" data-filter="hidden-gems">Hidden Gems</button>
+      <button class="lt-filter-pill" data-filter="food">Food</button>
+      <button class="lt-filter-pill" data-filter="culture">Culture</button>
+      <button class="lt-filter-pill" data-filter="off-beat">Off-beat</button>
+    </div>
+
+    <div class="lt-sections">
+
+      <!--  HIDDEN GEMS -->
+      <div class="lt-section">
+        <h2 class="lt-section-title">Hidden Gems</h2>
+
+        <div class="lt-gem-card" data-category="hidden-gems culture">
+          <div class="lt-gem-img"></div>
+          <div class="lt-gem-body">
+            <span class="lt-category-tag">Culture</span>
+            <h3 class="lt-gem-title">Secret Underground Market</h3>
+            <p class="lt-gem-desc">A labyrinthine bazaar hidden beneath the old town, known only to locals. Find handmade ceramics, vintage maps, and street-food stalls that have traded here for generations.</p>
+            <a href="#" class="lt-learn-more">Learn more &rarr;</a>
+          </div>
+        </div>
+
+        <div class="lt-gem-card" data-category="hidden-gems food">
+          <div class="lt-gem-img lt-gem-img--food"></div>
+          <div class="lt-gem-body">
+            <span class="lt-category-tag lt-tag-food">Food</span>
+            <h3 class="lt-gem-title">The Fisherman's Breakfast Spot</h3>
+            <p class="lt-gem-desc">Open only 5am–9am, this tiny harborside café serves the freshest catch with local bread — a morning ritual for fishermen since 1942.</p>
+            <a href="#" class="lt-learn-more">Learn more &rarr;</a>
+          </div>
+        </div>
+
+        <div class="lt-gem-card" data-category="hidden-gems">
+          <div class="lt-gem-img lt-gem-img--nature"></div>
+          <div class="lt-gem-body">
+            <span class="lt-category-tag lt-tag-nature">Nature</span>
+            <h3 class="lt-gem-title">Cliffside Sunset Viewpoint</h3>
+            <p class="lt-gem-desc">A 20-minute hike from the city edge leads to a panoramic cliff with views that rival any postcard — almost never crowded, even in summer.</p>
+            <a href="#" class="lt-learn-more">Learn more &rarr;</a>
+          </div>
+        </div>
+      </div>
+
+      <!-- DO'S & DON'TS -->
+      <div class="lt-section">
+        <h2 class="lt-section-title">Do's &amp; Don'ts</h2>
+
+        <ul class="lt-dos-list">
+          <li class="lt-do" data-category="culture">
+            <span class="lt-check">✓</span>
+            <span>Greet shopkeepers with the local phrase — a little effort goes a long way.</span>
+          </li>
+          <li class="lt-do" data-category="culture">
+            <span class="lt-check">✓</span>
+            <span>Carry cash for local markets — cards aren't widely accepted.</span>
+          </li>
+          <li class="lt-do" data-category="culture">
+            <span class="lt-check">✓</span>
+            <span>Dress modestly when visiting religious sites.</span>
+          </li>
+          <li class="lt-dont" data-category="culture">
+            <span class="lt-cross">✕</span>
+            <span>Don't photograph people without asking permission first.</span>
+          </li>
+          <li class="lt-dont" data-category="culture">
+            <span class="lt-cross">✕</span>
+            <span>Avoid peak tourist hours (10am–2pm) at major landmarks.</span>
+          </li>
+          <li class="lt-dont" data-category="culture">
+            <span class="lt-cross">✕</span>
+            <span>Don't haggle at fixed-price shops — only at open-air markets.</span>
+          </li>
+        </ul>
+      </div>
+
+      <!-- NON-TOURISTY EXPERIENCES -->
+      <div class="lt-section">
+        <h2 class="lt-section-title">Non-Touristy Experiences</h2>
+
+        <div class="lt-offbeat-card" data-category="off-beat">
+          <div class="lt-offbeat-header">
+            <h3 class="lt-offbeat-title">Morning Tea at the Old Men's Café</h3>
+            <span class="lt-offbeat-tag">Off-beat</span>
+          </div>
+          <div class="lt-offbeat-meta">
+            <span>⏱ Best: 7am – 10am</span>
+            <span class="lt-meta-dot">·</span>
+            <span>€ Free</span>
+          </div>
+          <p class="lt-offbeat-desc">Sit with locals playing backgammon over sweet tea at this 60-year-old neighbourhood spot. No English menu, all atmosphere.</p>
+        </div>
+
+        <div class="lt-offbeat-card" data-category="off-beat">
+          <div class="lt-offbeat-header">
+            <h3 class="lt-offbeat-title">Sunday Flea Market in the Port District</h3>
+            <span class="lt-offbeat-tag">Off-beat</span>
+          </div>
+          <div class="lt-offbeat-meta">
+            <span>⏱ Sundays: 8am – 1pm</span>
+            <span class="lt-meta-dot">·</span>
+            <span>€ Free entry</span>
+          </div>
+          <p class="lt-offbeat-desc">Discover vintage furniture, retro postcards, and handmade goods at this weekly market beloved by artists and antique hunters.</p>
+        </div>
+
+        <div class="lt-offbeat-card" data-category="off-beat">
+          <div class="lt-offbeat-header">
+            <h3 class="lt-offbeat-title">Neighbourhood Cooking Class</h3>
+            <span class="lt-offbeat-tag">Off-beat</span>
+          </div>
+          <div class="lt-offbeat-meta">
+            <span>⏱ 3hrs · Evenings</span>
+            <span class="lt-meta-dot">·</span>
+            <span>€ ~€25 per person</span>
+          </div>
+          <p class="lt-offbeat-desc">Cook traditional recipes in a local home, away from tourist-oriented schools. Usually limited to 4–6 guests for an intimate feel.</p>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+
+<!-- ITINERARY -->
+<div class="cp-tab-panel" id="tab-itinerary">
+  <div class="cp-panel-inner">
+    <div class="cp-placeholder-state">
+      <div class="cp-placeholder-icon">🗓️</div>
+      <h3>Itinerary</h3>
+      <p>Day-by-day itinerary suggestions, highlights, and travel routes coming soon.</p>
+    </div>
+  </div>
+</div>
+
+
+<!-- TRANSPORT -->
+<div class="cp-tab-panel" id="tab-transport">
+  <div class="cp-panel-inner">
+    <div class="cp-placeholder-state">
+      <div class="cp-placeholder-icon">✈️</div>
+      <h3>Transport</h3>
+      <p>Getting there, getting around, and transport tips coming soon.</p>
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+  var tabs   = document.querySelectorAll('.cp-tab');
+  var panels = document.querySelectorAll('.cp-tab-panel');
+
+  tabs.forEach(function (tab) {
+    tab.addEventListener('click', function () {
+      tabs.forEach(function (t) { t.classList.remove('active'); });
+      panels.forEach(function (p) { p.classList.remove('active'); });
+      this.classList.add('active');
+      document.getElementById(this.dataset.target).classList.add('active');
+    });
+  });
+
+  var pills = document.querySelectorAll('.lt-filter-pill');
+
+  pills.forEach(function (pill) {
+    pill.addEventListener('click', function () {
+      pills.forEach(function (p) { p.classList.remove('active'); });
+      this.classList.add('active');
+      var filter = this.dataset.filter;
+
+      document.querySelectorAll('[data-category]').forEach(function (item) {
+        if (filter === 'all') {
+          item.style.display = '';
+        } else {
+          var cats = item.dataset.category.split(' ');
+          item.style.display = cats.indexOf(filter) !== -1 ? '' : 'none';
         }
-      } finally {
-        btn.classList.remove('saving');
-      }
-      return;
-    }
+      });
 
+      document.querySelectorAll('.lt-section').forEach(function (section) {
+        var items = section.querySelectorAll('[data-category]');
+        var anyVisible = Array.prototype.some.call(items, function (el) {
+          return el.style.display !== 'none';
+        });
+        section.style.display = (filter === 'all' || anyVisible) ? '' : 'none';
+      });
+    });
+  });
+}());
+</script>
+
+
+{% if user.is_authenticated %}
+<script>
+const _DEST_CSRF = document.querySelector('meta[name="csrf-token"]')?.content || '';
+const _DEST_SAVED_MAP = {{ saved_trip_map_json }};
+
+(function initDestBtn() {
+  const btn = document.getElementById('destSaveBtn');
+  const slug = btn && btn.dataset.destination;
+  if (slug && _DEST_SAVED_MAP[slug]) {
+    btn.classList.add('saved');
+    btn.dataset.tripId = _DEST_SAVED_MAP[slug];
+    document.getElementById('destSaveBtnLabel').textContent = 'Saved';
+  }
+})();
+
+async function saveDestTrip(btn) {
+  if (btn.classList.contains('saving')) return;
+  btn.classList.add('saving');
+  const destination = btn.dataset.destination;
+  const title = btn.dataset.title;
+  const label = document.getElementById('destSaveBtnLabel');
+
+  if (btn.classList.contains('saved')) {
+    const tripId = btn.dataset.tripId;
+    if (!tripId) { btn.classList.remove('saving'); return; }
     try {
-      const res = await fetch('/api/trips/save/', {
+      const res = await fetch(`/api/trips/${tripId}/unsave/`, {
         method: 'POST',
-        headers: {'Content-Type': 'application/json', 'X-CSRFToken': _DEST_CSRF},
-        body: JSON.stringify({destination, title}),
+        headers: {'X-CSRFToken': _DEST_CSRF},
       });
       if (res.ok) {
-        const data = await res.json();
-        btn.classList.add('saved');
-        btn.dataset.tripId = data.id;
-        label.textContent = 'Saved';
-        _DEST_SAVED_MAP[destination] = data.id;
+        btn.classList.remove('saved');
+        btn.dataset.tripId = '';
+        label.textContent = 'Save';
+        delete _DEST_SAVED_MAP[destination];
       }
     } finally {
       btn.classList.remove('saving');
     }
+    return;
   }
-  </script>
-  {% else %}
-  <script>
-  function saveDestTrip() {
-    window.location.href = '/accounts/login/?next=' + encodeURIComponent(window.location.pathname);
+
+  try {
+    const res = await fetch('/api/trips/save/', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json', 'X-CSRFToken': _DEST_CSRF},
+      body: JSON.stringify({destination, title}),
+    });
+    if (res.ok) {
+      const data = await res.json();
+      btn.classList.add('saved');
+      btn.dataset.tripId = data.id;
+      label.textContent = 'Saved';
+      _DEST_SAVED_MAP[destination] = data.id;
+    }
+  } finally {
+    btn.classList.remove('saving');
   }
-  </script>
-  {% endif %}
-
-  <!-- WHY: the explainability panel (the product's core promise) -->
-  <div class="info-card" style="margin-bottom: 28px; border-left: 4px solid var(--orange);">
-    <h3>Why this score?</h3>
-    <p style="color:#3A5A6A; line-height:1.7; margin-bottom:16px;">{{ why }}</p>
-    {% for f in scored.factors %}
-      <div class="info-row">
-        <span class="info-row-label">
-          {{ f.name }}
-          {% if f.is_stale %}<span title="based on aging data" style="color:#E8623A;">⚠</span>{% endif %}
-        </span>
-        <span class="info-row-value">{{ f.points|floatformat:0 }} pts &nbsp;<span style="color:#6B8A99;">({{ f.raw_score|floatformat:0 }}/100 × {{ f.weight|floatformat:2 }})</span></span>
-      </div>
-      <div style="font-size:12px; color:#6B8A99; margin:-4px 0 10px;">{{ f.detail }}</div>
-    {% endfor %}
-    {% if scored.has_stale_inputs %}
-      <p style="font-size:12px; color:#E8623A; margin-top:8px;">⚠ Some inputs are older than their freshness window — treat this score as indicative.</p>
-    {% endif %}
-  </div>
-
-  <!-- Tabs -->
-  <div class="dest-tabs">
-    <button class="dest-tab active" onclick="showTab('overview', this)">Overview</button>
-    <button class="dest-tab" onclick="showTab('cost', this)">Cost</button>
-    <button class="dest-tab" onclick="showTab('safety', this)">Safety &amp; Health</button>
-    <button class="dest-tab" onclick="showTab('weather', this)">Weather</button>
-  </div>
-
-  <!-- TAB: Overview -->
-  <div id="overview" class="tab-content active">
-    <p style="color: #3A5A6A; max-width: 700px; margin: 24px 0 32px; line-height: 1.9; font-size: 15px;">
-      {{ city.summary }}
-    </p>
-    <div style="display: grid; grid-template-columns: repeat(3,1fr); gap: 20px; margin-bottom: 48px;">
-      <div class="info-card">
-        <h3>General Info</h3>
-        <div class="info-row"><span class="info-row-label">Country</span><span class="info-row-value">{{ city.country.name }}</span></div>
-        <div class="info-row"><span class="info-row-label">Region</span><span class="info-row-value">{{ city.country.get_region_display }}</span></div>
-        <div class="info-row"><span class="info-row-label">Language</span><span class="info-row-value">{{ city.country.language }}</span></div>
-        <div class="info-row"><span class="info-row-label">Currency</span><span class="info-row-value">{{ city.country.currency }}</span></div>
-        <div class="info-row"><span class="info-row-label">Category</span><span class="info-row-value">{{ city.get_primary_category_display }}</span></div>
-      </div>
-      <div class="info-card">
-        <h3>Visa Info</h3>
-        <p style="color:#3A5A6A; font-size:13px; line-height:1.6;">{{ city.country.visa_summary|default:"Check the latest official guidance for your nationality." }}</p>
-      </div>
-      <div class="info-card">
-        <h3>Top Activities</h3>
-        {% for a in activities %}
-          <div class="info-row"><span class="info-row-label">{{ a.name }}</span><span class="info-row-value">{{ a.get_category_display }}</span></div>
-        {% empty %}
-          <p style="color:#6B8A99; font-size:13px;">No activities recorded yet.</p>
-        {% endfor %}
-      </div>
-    </div>
-  </div>
-
-  <!-- TAB: Cost -->
-  <div id="cost" class="tab-content">
-    {% if latest_cost %}
-    <div style="display: grid; grid-template-columns: repeat(2,1fr); gap: 20px; margin: 24px 0 48px;">
-      <div class="info-card">
-        <h3>Daily Budget</h3>
-        <div class="info-row"><span class="info-row-label">Budget traveller</span><span class="info-row-value" style="color:#2EB85C;">€{{ latest_cost.daily_budget_eur }}/day</span></div>
-        <div class="info-row"><span class="info-row-label">Mid-range</span><span class="info-row-value">€{{ latest_cost.daily_midrange_eur }}/day</span></div>
-        <div class="info-row"><span class="info-row-label">Luxury</span><span class="info-row-value">€{{ latest_cost.daily_luxury_eur }}/day</span></div>
-      </div>
-      <div class="info-card">
-        <h3>Typical Costs</h3>
-        <div class="info-row"><span class="info-row-label">Hostel / dorm</span><span class="info-row-value">€{{ latest_cost.hostel_night_eur }}/night</span></div>
-        <div class="info-row"><span class="info-row-label">Cheap meal</span><span class="info-row-value">€{{ latest_cost.meal_cheap_eur }}</span></div>
-        <div class="info-row"><span class="info-row-label">Local transport/day</span><span class="info-row-value">€{{ latest_cost.local_transport_day_eur }}</span></div>
-        <div class="info-row"><span class="info-row-label">Source</span><span class="info-row-value">{{ latest_cost.get_source_display }}{% if latest_cost.is_stale %} ⚠{% endif %}</span></div>
-      </div>
-    </div>
-    {% else %}
-      <p style="color:#6B8A99; margin:24px 0;">No cost data on file yet.</p>
-    {% endif %}
-  </div>
-
-  <!-- TAB: Safety & Health -->
-  <div id="safety" class="tab-content">
-    {% if latest_safety %}
-    <div style="display: grid; grid-template-columns: repeat(2,1fr); gap: 20px; margin: 24px 0 48px;">
-      <div class="info-card">
-        <h3>Safety Overview</h3>
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
-          <span class="level-safe" style="font-size: 20px; font-weight: 700;">{{ latest_safety.get_level_display }}</span>
-          <span class="score-badge" style="font-size: 14px;">{{ latest_safety.safety_score }}/100</span>
-        </div>
-        <div class="info-row"><span class="info-row-label">Advisory</span><span class="info-row-value">{{ latest_safety.advisory_summary }}</span></div>
-        <div class="info-row"><span class="info-row-label">Captured</span><span class="info-row-value">{{ latest_safety.captured_at|date:"M Y" }}{% if latest_safety.is_stale %} ⚠{% endif %}</span></div>
-      </div>
-      <div class="info-card">
-        <h3>Health</h3>
-        <p style="color:#3A5A6A; font-size:13px; line-height:1.6;">{{ latest_safety.health_notes }}</p>
-      </div>
-    </div>
-    {% else %}
-      <p style="color:#6B8A99; margin:24px 0;">No safety advisory on file yet.</p>
-    {% endif %}
-  </div>
-
-  <!-- TAB: Weather -->
-  <div id="weather" class="tab-content">
-    <div style="display:flex; flex-wrap:wrap; gap:10px; margin:24px 0 32px;">
-      {% for w in weather %}
-        <div style="padding:12px 16px;border-radius:8px;font-size:13px;font-weight:700;text-align:center;min-width:70px;
-          {% if w.is_recommended_month %}background:rgba(46,184,92,0.18);border:1px solid rgba(46,184,92,0.4);color:#2EB85C;{% else %}background:rgba(0,0,0,0.04);border:1px solid rgba(0,0,0,0.08);color:#3A5A6A;{% endif %}">
-          <div>{{ w.month }}{% if w.is_recommended_month %} ⭐{% endif %}</div>
-          <div style="font-size:11px;font-weight:400;margin-top:4px;">{{ w.avg_high_c }}°C · {{ w.rainfall_mm }}mm</div>
-        </div>
-      {% empty %}
-        <p style="color:#6B8A99;">No climate data on file yet.</p>
-      {% endfor %}
-    </div>
-  </div>
-
-</div>
-
-<script>
-function showTab(tabId, btn) {
-  document.querySelectorAll('.tab-content').forEach(function(t) { t.classList.remove('active'); });
-  document.querySelectorAll('.dest-tab').forEach(function(b) { b.classList.remove('active'); });
-  document.getElementById(tabId).classList.add('active');
-  btn.classList.add('active');
 }
 </script>
+{% else %}
+<script>
+function saveDestTrip() {
+  window.location.href = '/accounts/login/?next=' + encodeURIComponent(window.location.pathname);
+}
+</script>
+{% endif %}
+
 {% endblock %}
