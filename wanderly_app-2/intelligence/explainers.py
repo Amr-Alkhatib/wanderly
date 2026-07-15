@@ -13,7 +13,7 @@ so choosing a vendor (Gemini, Groq, ...) is a one-line config change, not a
 code change. The default `NullExplainer` needs no network and no API key.
 """
 from __future__ import annotations
-
+import os
 import abc
 import logging
 from importlib import import_module
@@ -101,7 +101,7 @@ class LLMExplainerBase(Explainer):
 
 class GeminiExplainer(LLMExplainerBase):
 
-    MODEL = "gemini-2.5-flash"
+    MODEL = os.environ.get("GEMINI_MODEL", "gemini-3.5-flash")
 
     def _complete(self, prompt: str) -> str:
         import os

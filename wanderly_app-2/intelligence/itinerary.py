@@ -38,19 +38,62 @@ def build_itinerary(city, days: int = 3) -> list[ItineraryDay]:
         print(f"[build_itinerary] ERROR: {exc}")
         return []
 
+#: Overridable so future model deprecations don't require a code change.
+#: Tried in order; env var can override the primary without a redeploy.
+GEMINI_MODELS: tuple[str, ...] = (
+    os.environ.get("GEMINI_MODEL", "gemini-3.5-flash"),
+    "gemini-3.1-flash-lite",
+    "gemini-3-flash-preview",
+)
+
+#: If "1" (default), an ungrounded call is allowed as the very last resort
+#: so users get an itinerary even when grounding capacity is exhausted.
+ALLOW_UNGROUNDED_FALLBACK = os.environ.get("GEMINI_ALLOW_UNGROUNDED", "1") == "1"
+
+
 def _complete(prompt: str) -> str:
     from google import genai
     from google.genai import types
 
-    client = genai.Client(api_key=os.environ.get("GEMINI_API_KEY", ""))
-    resp = client.models.generate_content(
-        model="gemini-2.5-flash",
-        contents=prompt,
-        config=types.GenerateContentConfig(
-            tools=[types.Tool(google_search=types.GoogleSearch())],
-        ),
+    api_key = os.environ.get("GEMINI_API_KEY", "")
+    if not api_key:
+        raise RuntimeError("GEMINI_API_KEY is not set in the environment.")
+
+    client = genai.Client(
+        api_key=api_key,
+        http_options=types.HttpOptions(timeout=25_000),  # 25s cap per attempt
     )
-    return resp.text or ""
+    grounded_config = types.GenerateContentConfig(
+        tools=[types.Tool(google_search=types.GoogleSearch())],
+    )
+
+    last_exc: Exception | None = None
+
+    # Pass 1: every model WITH Google Search grounding.
+    for model in GEMINI_MODELS:
+        try:
+            resp = client.models.generate_content(
+                model=model, contents=prompt, config=grounded_config
+            )
+            if resp.text:
+                return resp.text
+        except Exception as exc:
+            print(f"[_complete] grounded {model} failed: {exc!r}")
+            last_exc = exc
+
+    # Pass 2 (last resort): primary model without grounding.
+    if ALLOW_UNGROUNDED_FALLBACK:
+        for model in GEMINI_MODELS:
+            try:
+                print(f"[_complete] falling back to ungrounded {model}")
+                resp = client.models.generate_content(model=model, contents=prompt)
+                if resp.text:
+                    return resp.text
+            except Exception as exc:
+                print(f"[_complete] ungrounded {model} failed: {exc!r}")
+                last_exc = exc
+
+    raise last_exc or RuntimeError("All Gemini attempts failed.")
 
 
 def _parse(text: str) -> list[ItineraryDay]:
