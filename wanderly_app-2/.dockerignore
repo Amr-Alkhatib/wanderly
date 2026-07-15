@@ -1,8 +1,4 @@
-venv/
-.venv/
-__pycache__/
-*.pyc
-db.sqlite3
+fly.toml
 .git/
-.idea/
-staticfiles/
+*.sqlite3
+.env

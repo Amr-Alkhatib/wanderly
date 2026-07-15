@@ -1,22 +1,40 @@
-# Core framework
-Django==5.1.4
-python-dotenv
+annotated-types==0.7.0
+anyio==4.13.0
 asgiref==3.8.1
-
-
-sqlparse==0.5.3
-
-# PostgreSQL driver (production DB; SQLite needs no driver for local dev)
-psycopg[binary]==3.2.3
-
-# Production WSGI server + static file serving
+certifi==2026.5.20
+cffi==2.0.0
+cryptography==48.0.0
+deprecation==2.1.0
+dj-database-url==3.1.2
+Django==5.1.4
 gunicorn==23.0.0
+h11==0.16.0
+h2==4.3.0
+hpack==4.1.0
+httpcore==1.0.9
+httpx==0.28.1
+hyperframe==6.1.0
+idna==3.18
+multidict==6.7.1
+packaging==26.2
+postgrest==2.31.0
+propcache==0.5.2
+psycopg==3.2.3
+psycopg2-binary==2.9.12
+pycparser==3.0
+pydantic==2.13.4
+pydantic_core==2.46.4
+PyJWT==2.13.0
+python-dotenv==1.2.2
+realtime==2.31.0
+sqlparse==0.5.3
+storage3==2.31.0
+StrEnum==0.4.15
+supabase==2.31.0
+supabase-auth==2.31.0
+supabase-functions==2.31.0
+typing-inspection==0.4.2
+typing_extensions==4.15.0
+websockets==15.0.1
 whitenoise==6.8.2
-
-# Supabase integration
-supabase>=2.10.0
-
-# --- Planned next-step dependencies (left commented until wired in) ---
-# praw==7.8.1            # Reddit ingestion (ReviewSource)
-# transformers==4.46.0  # ABSA model inference
-# torch                 # transformers backend
+yarl==1.24.2
