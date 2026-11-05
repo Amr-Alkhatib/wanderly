@@ -22,8 +22,7 @@ RUN set -ex && \
     rm -rf /root/.cache/
 COPY . /code
 
-ENV SECRET_KEY "crJGtLGPw9z8VIIA8e9iwdSlAIyfT4DWxyUut5ThirXTz6Kvl1"
-RUN python manage.py collectstatic --noinput
+RUN DJANGO_SECRET_KEY=build-only-not-secret python manage.py collectstatic --noinput
 
 EXPOSE 8000
 
