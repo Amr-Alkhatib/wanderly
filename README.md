@@ -1,53 +1,50 @@
 # Wanderly
 
-**Discover more. Travel deeper.** A freshness-aware travel recommender that
-ranks destinations with a transparent, per-factor score — and always
-explains *why*, not just *what*.
+**Discover more. Travel deeper.** Wanderly is a travel recommender that ranks destinations with a transparent score broken down factor by factor, and always explains *why* a city ranks where it does, not just *what* the ranking is.
 
-TUM Project Work (IN8028).
+TUM Project Work (IN8028) · Python · Django · PostgreSQL / SQLite · Supabase Auth · Docker
 
 ---
 
-## Architecture: three honest, separable layers
+## What it does
 
-Wanderly is built so the recommendation can always be justified. The LLM is
-**never** the ranker — it is an optional presentation layer on top of a
-deterministic engine.
+- **Personal ranking.** Users set budget, safety, climate and interest preferences. Every city gets a score from four weighted factors.
+- **Explanations you can check.** Each result breaks down how much each factor contributed, so "why does Hanoi rank above Marrakech?" has a reproducible answer.
+- **Freshness warnings.** Every volatile fact (prices, weather, safety advisories) stores its source and capture date. Data older than its freshness window is flagged with ⚠ in the UI instead of being shown as current.
+- **Compare, save, plan.** Side-by-side city comparison, country and destination profiles, saved trips (Supabase Auth) and a day-by-day itinerary.
+
+---
+
+## Architecture: three separable layers
+
+The LLM is **never** the ranker. It is an optional presentation layer on top of a deterministic engine.
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│  web/            Presentation: thin views, templates          │
-│                  (no business logic)                          │
+│  web/            Presentation: thin views, templates         │
+│                  (no business logic)                         │
 ├─────────────────────────────────────────────────────────────┤
-│  intelligence/   Deterministic RecommendationEngine           │
+│  intelligence/   Deterministic RecommendationEngine          │
 │                  → ScoredCity + FactorContribution + explain()│
 │                  Explainer interface (LLM = swappable, off by │
-│                  default via NullExplainer)                   │
+│                  default via NullExplainer)                  │
 ├─────────────────────────────────────────────────────────────┤
-│  destinations/   Data layer: normalized Country/City/Activity │
-│                  + provenance-stamped, time-grained           │
+│  destinations/   Data layer: normalized Country/City/Activity│
+│                  + provenance-stamped, time-grained          │
 │                  MonthlyWeather / CostSnapshot / SafetyAdvisory│
-│                  (the database is the differentiator)         │
 └─────────────────────────────────────────────────────────────┘
 ```
 
-**Why the LLM is not the ranker.** If the model produced the ranking, a
-tutor asking "why does Hanoi rank above Marrakech?" gets "the model decided."
-Instead, `RecommendationEngine` scores every city by transparent arithmetic
-over four weighted factors (budget, safety, climate, interests), and each
-`ScoredCity.explain()` returns a reproducible breakdown. The `Explainer` only
-rephrases that breakdown; it cannot change a score.
+**Why the LLM is not the ranker.** If a model produced the ranking, the only answer to "why this order?" would be "the model decided". Instead, `RecommendationEngine` scores every city with transparent arithmetic over four weighted factors (budget, safety, climate, interests). The weights live as class attributes, in one auditable place. `ScoredCity.explain()` returns a reproducible breakdown. The `Explainer` can only rephrase that breakdown. It can never change a score.
 
-**Freshness-aware.** Every volatile fact records its `source` and
-`captured_at`. The engine flags any factor built on data older than its
-freshness window, and the UI shows a ⚠ so an aging number is never presented
-as fresh truth.
+**Freshness-aware.** Every volatile fact records its `source` and `captured_at`. The engine flags any factor built on data older than its freshness window.
 
 ---
 
 ## Quick start (local, zero config)
 
 ```bash
+cd wanderly_app-2
 python -m venv venv && source venv/bin/activate
 pip install -r requirements.txt
 python manage.py migrate          # uses SQLite by default
@@ -57,7 +54,7 @@ python manage.py runserver
 
 Visit http://127.0.0.1:8000/.
 
-Run the tests:
+Run the tests (14 tests covering the engine and the comparison logic):
 
 ```bash
 python manage.py test
@@ -67,8 +64,7 @@ python manage.py test
 
 ## Configuration
 
-Security-sensitive and environment-specific values are read from the
-environment (sensible local defaults are provided):
+Security-sensitive and environment-specific values are read from the environment. Sensible local defaults are provided.
 
 | Variable | Default | Purpose |
 | --- | --- | --- |
@@ -77,40 +73,33 @@ environment (sensible local defaults are provided):
 | `DJANGO_ALLOWED_HOSTS` | `localhost,127.0.0.1` | Comma-separated. |
 | `DJANGO_DB_ENGINE` | `sqlite3` | Set `postgresql` to use Postgres. |
 | `DJANGO_DB_*` | — | Name/User/Password/Host/Port for Postgres. |
-| `WANDERLY_EXPLAINER_BACKEND` | `intelligence.explainers.NullExplainer` | Dotted path to the explainer. Swap to a Gemini/Groq subclass to enable LLM prose — a config change, not an architecture change. |
+| `SUPABASE_URL`, `SUPABASE_ANON_KEY` | project defaults | Auth and saved trips. The anon key is public by design. |
+| `SUPABASE_SERVICE_KEY` | empty | Backend only. Never commit it. |
+| `WANDERLY_EXPLAINER_BACKEND` | `intelligence.explainers.NullExplainer` | Dotted path to the explainer. Swap in a Gemini/Groq subclass to enable LLM prose. It's a config change, not an architecture change. |
 
 ---
 
-## SQLite → PostgreSQL migration path
+## SQLite → PostgreSQL
 
-1. Provision Postgres and set `DJANGO_DB_ENGINE=postgresql` plus the
-   `DJANGO_DB_*` variables.
-2. `python manage.py migrate` against the empty Postgres database.
-3. Re-run `python manage.py seed_demo` (environment-agnostic), **or** move
-   existing data with `dumpdata`/`loaddata`.
-
----
+1. Provision Postgres and set `DJANGO_DB_ENGINE=postgresql` plus the `DJANGO_DB_*` variables.
+2. Run `python manage.py migrate` against the empty database.
+3. Re-run `python manage.py seed_demo`, **or** move existing data with `dumpdata` / `loaddata`.
 
 ## Docker
 
 ```bash
+cd wanderly_app-2
 docker compose up --build
 ```
 
-Brings up Postgres + the app (gunicorn, `DEBUG=0`), runs migrations on start,
-and serves on http://localhost:8000/. Static files are served by WhiteNoise.
+This brings up Postgres and the app (gunicorn, `DEBUG=0`), runs migrations on start and serves on http://localhost:8000/. Static files are served by WhiteNoise. A `fly.toml` is included for deployment to Fly.io.
 
 ---
 
 ## Planned next steps (seams already in place)
 
-These are intentionally **not** in this MVP, but the interfaces exist so they
-drop in without rework:
+These are intentionally **not** in this MVP, but the interfaces exist so they can drop in without rework:
 
-- **Review ingestion**: a `ReviewSource` interface + `RedditSource` (PRAW),
-  driven by a `scrape_reddit` management command.
-- **ABSA model**: writes structured sentiment into `intelligence.CityAspectScore`
-  (already consumed by the engine's interest factor).
-- **Scheduled refresh**: GitHub Actions cron invoking the management commands
-  (`scrape_reddit`, `refresh_weather`, `enrich_aspects`) — no Celery/Redis
-  needed for an academic-scale pipeline.
+- **Review ingestion:** a `ReviewSource` interface plus a `RedditSource` (PRAW), driven by a management command.
+- **Aspect-based sentiment:** writes structured sentiment into `intelligence.CityAspectScore`, which the engine's interest factor already consumes.
+- **Scheduled refresh:** a GitHub Actions cron that runs the refresh commands. No Celery/Redis needed at academic scale.
