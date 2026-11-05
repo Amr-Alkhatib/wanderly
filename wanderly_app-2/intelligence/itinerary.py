@@ -137,13 +137,10 @@ def _generate(prompt: str) -> list[ItineraryDay]:
     if not api_key:
         raise RuntimeError("GEMINI_API_KEY is not set in the environment.")
 
-    client = genai.Client(
-        api_key=api_key,
-        http_options=types.HttpOptions(
-            timeout=PER_CALL_TIMEOUT_S * 1000,  # milliseconds
-            retry_options=types.HttpRetryOptions(attempts=1),  # we handle fallback
-        ),
-    )
+    http_options: dict[str, object] = {"timeout": PER_CALL_TIMEOUT_S * 1000}  # ms
+    if hasattr(types, "HttpRetryOptions"):  # older SDKs don't have it
+        http_options["retry_options"] = types.HttpRetryOptions(attempts=1)
+    client = genai.Client(api_key=api_key, http_options=types.HttpOptions(**http_options))
 
     deadline = time.monotonic() + TOTAL_BUDGET_S
     last_exc: Exception | None = None

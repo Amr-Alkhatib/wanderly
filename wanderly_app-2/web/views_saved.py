@@ -33,7 +33,7 @@ def get_saved_trip_map(user) -> dict:
     except Exception as exc:
         print(f"[get_saved_trip_map] ERROR uid={uid[:8]}: {exc}")
         logger.warning("Could not fetch saved trips for %s: %s", user, exc)
-        raise
+        return {}  # the page still renders; only the "saved" hearts are missing
 
 
 @login_required
