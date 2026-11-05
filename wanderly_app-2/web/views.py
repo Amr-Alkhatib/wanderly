@@ -171,16 +171,16 @@ def home(request: HttpRequest) -> HttpResponse:
         sc for sc in engine.rank(_cities_with_related()) if sc.city.id not in featured_ids
     ][:5]
 
-    # Category tiles mirror the mockup exactly: fixed label, value (for the
-    # search filter) and brand colour. Kept here, not in the template, so the
-    # palette lives in one auditable place.
+    # Category tiles: label, value (for the search filter), brand colour and
+    # background image. Kept here, not in the template, so the palette lives
+    # in one auditable place. Each label matches the category it filters by.
     category_tiles = [
-        ("Beach", ActivityCategory.BEACH, "#3380b2"),
-        ("Mountains", ActivityCategory.MOUNTAINS, "#4d734d"),
-        ("Cities", ActivityCategory.CITY, "#1a3c4e"),
-        ("Food", ActivityCategory.FOOD, "#f4845f"),
-        ("History", ActivityCategory.CULTURAL, "#805933"),
-        ("Nature", ActivityCategory.NATURE, "#408c59"),
+        ("Beach", ActivityCategory.BEACH, "#3380b2", "beach"),
+        ("Mountains", ActivityCategory.MOUNTAINS, "#4d734d", "mountains"),
+        ("Cities", ActivityCategory.CITY, "#1a3c4e", "cities"),
+        ("Food", ActivityCategory.FOOD, "#f4845f", "food"),
+        ("Culture", ActivityCategory.CULTURAL, "#805933", "history"),
+        ("Nature", ActivityCategory.NATURE, "#408c59", "nature"),
     ]
 
     from web.views_saved import get_saved_trip_map

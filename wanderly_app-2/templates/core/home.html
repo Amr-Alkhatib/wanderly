@@ -97,7 +97,7 @@
           <span class="pick-info">
             <span class="pick-name">{{ sc.city.country.name }}</span>
             <span class="pick-meta">
-              {% with cost=sc.city.cost_snapshots.first %}{% if cost %}${{ cost.daily_budget_eur }}/day · {% endif %}{% endwith %}{{ sc.city.safety_label }}
+              {% with cost=sc.city.cost_snapshots.first %}{% if cost %}€{{ cost.daily_budget_eur }}/day · {% endif %}{% endwith %}{{ sc.city.safety_label }}
             </span>
           </span>
           <span class="pick-score" title="{{ sc.explain }}">→</span>
@@ -109,8 +109,8 @@
     <section class="col-side">
       <h2 class="section-title">Plan by Category</h2>
       <div class="category-grid">
-        {% for label, value, color in category_tiles %}
-            <a class="category-tile" style="background:{{ color }}; background-image: url('{% static 'images/categories/' %}{{ label|lower }}.png'); background-size: cover; background-blend-mode: hard-light;"
+        {% for label, value, color, image in category_tiles %}
+            <a class="category-tile" style="background:{{ color }}; background-image: url('{% static 'images/categories/' %}{{ image }}.png'); background-size: cover; background-blend-mode: hard-light;"
             href="{% url 'search' %}?category={{ value }}">{{ label }}</a>
         {% endfor %}
       </div>
