@@ -50,7 +50,7 @@ GEMINI_MODELS: tuple[str, ...] = tuple(
         m
         for m in (
             os.environ.get("GEMINI_MODEL", "gemini-3.5-flash-lite"),
-            "gemini-3.8-flash",
+            "gemini-3.1-flash-lite",
         )
         if m
     )

@@ -2,7 +2,9 @@
 
 **Discover more. Travel deeper.** Wanderly is a travel recommender that ranks destinations with a transparent score broken down factor by factor, and always explains *why* a city ranks where it does, not just *what* the ranking is.
 
-TUM Project Work (IN8028) · Python · Django · PostgreSQL / SQLite · Supabase Auth · Docker
+**Live demo:** https://wanderly.pythonanywhere.com
+
+TUM Project Work (IN8028) · Python · Django · PostgreSQL / SQLite · Supabase Auth · Gemini · Docker
 
 ---
 
@@ -11,7 +13,8 @@ TUM Project Work (IN8028) · Python · Django · PostgreSQL / SQLite · Supabase
 - **Personal ranking.** Users set budget, safety, climate and interest preferences. Every city gets a score from four weighted factors.
 - **Explanations you can check.** Each result breaks down how much each factor contributed, so "why does Hanoi rank above Marrakech?" has a reproducible answer.
 - **Freshness warnings.** Every volatile fact (prices, weather, safety advisories) stores its source and capture date. Data older than its freshness window is flagged with ⚠ in the UI instead of being shown as current.
-- **Compare, save, plan.** Side-by-side city comparison, country and destination profiles, saved trips (Supabase Auth) and a day-by-day itinerary.
+- **Compare, save, plan.** Side-by-side city comparison, country and destination profiles, saved trips (Supabase Auth) and an AI day-by-day itinerary.
+- **AI itinerary that never blocks the page.** The page loads instantly and fetches the itinerary separately. Gemini returns schema-validated JSON in about 2 seconds, with a time-capped fallback model and a 24-hour cache.
 
 ---
 
@@ -54,7 +57,7 @@ python manage.py runserver
 
 Visit http://127.0.0.1:8000/.
 
-Run the tests (14 tests covering the engine and the comparison logic):
+Run the tests (27 tests covering the engine, the comparison logic, the itinerary and the destination page):
 
 ```bash
 python manage.py test
@@ -75,6 +78,8 @@ Security-sensitive and environment-specific values are read from the environment
 | `DJANGO_DB_*` | — | Name/User/Password/Host/Port for Postgres. |
 | `SUPABASE_URL`, `SUPABASE_ANON_KEY` | project defaults | Auth and saved trips. The anon key is public by design. |
 | `SUPABASE_SERVICE_KEY` | empty | Backend only. Never commit it. |
+| `GEMINI_API_KEY` | — | Needed for the AI itinerary. Never commit it. |
+| `GEMINI_MODEL` | `gemini-3.5-flash-lite` | Primary itinerary model. Change it here when Google retires a model. |
 | `WANDERLY_EXPLAINER_BACKEND` | `intelligence.explainers.NullExplainer` | Dotted path to the explainer. Swap in a Gemini/Groq subclass to enable LLM prose. It's a config change, not an architecture change. |
 
 ---
