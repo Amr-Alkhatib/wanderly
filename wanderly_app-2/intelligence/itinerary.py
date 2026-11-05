@@ -57,6 +57,9 @@ GEMINI_MODELS: tuple[str, ...] = tuple(
 )
 
 USE_GROUNDING = os.environ.get("GEMINI_GROUNDING", "0") == "1"
+#: Gemini 3 models "think" before answering, which adds seconds. A trip plan
+#: doesn't need deep reasoning. Set GEMINI_THINKING_LEVEL="" to use the default.
+THINKING_LEVEL = os.environ.get("GEMINI_THINKING_LEVEL", "low")
 PER_CALL_TIMEOUT_S = int(os.environ.get("GEMINI_TIMEOUT_S", "15"))
 TOTAL_BUDGET_S = int(os.environ.get("GEMINI_TOTAL_BUDGET_S", "30"))
 CACHE_SECONDS = 60 * 60 * 24
@@ -102,9 +105,18 @@ class _Plan(BaseModel):
 # --- Public entry point ------------------------------------------------------
 
 
+def _cache_key(city, days: int) -> str:
+    return f"itinerary:v2:{city.pk}:{days}"
+
+
+def cached_itinerary(city, days: int = 3) -> list[ItineraryDay] | None:
+    """The cached itinerary if there is one, without ever calling Gemini."""
+    return cache.get(_cache_key(city, days))
+
+
 def build_itinerary(city, days: int = 3) -> list[ItineraryDay]:
     """Return the itinerary, or an empty list if it could not be generated."""
-    key = f"itinerary:v2:{city.pk}:{days}"
+    key = _cache_key(city, days)
     cached = cache.get(key)
     if cached is not None:
         return cached
@@ -151,23 +163,7 @@ def _generate(prompt: str) -> list[ItineraryDay]:
             break
         started = time.monotonic()
         try:
-            if USE_GROUNDING:
-                config = types.GenerateContentConfig(
-                    tools=[types.Tool(google_search=types.GoogleSearch())],
-                )
-                resp = client.models.generate_content(
-                    model=model, contents=prompt + TEXT_FORMAT, config=config
-                )
-                days = _parse(resp.text or "")
-            else:
-                config = types.GenerateContentConfig(
-                    response_mime_type="application/json",
-                    response_schema=_Plan,
-                )
-                resp = client.models.generate_content(
-                    model=model, contents=prompt, config=config
-                )
-                days = _from_plan(resp.parsed) or _from_json(resp.text or "")
+            days = _call_model(client, types, model, prompt, THINKING_LEVEL)
 
             logger.info("Itinerary from %s in %.1fs", model, time.monotonic() - started)
             if days:
@@ -183,6 +179,32 @@ def _generate(prompt: str) -> list[ItineraryDay]:
     if last_exc:
         raise last_exc
     return []
+
+
+def _call_model(client, types, model: str, prompt: str, thinking_level: str):
+    extra: dict[str, object] = {}
+    if thinking_level:
+        extra["thinking_config"] = types.ThinkingConfig(thinking_level=thinking_level)
+    try:
+        if USE_GROUNDING:
+            config = types.GenerateContentConfig(
+                tools=[types.Tool(google_search=types.GoogleSearch())], **extra
+            )
+            resp = client.models.generate_content(
+                model=model, contents=prompt + TEXT_FORMAT, config=config
+            )
+            return _parse(resp.text or "")
+        config = types.GenerateContentConfig(
+            response_mime_type="application/json", response_schema=_Plan, **extra
+        )
+        resp = client.models.generate_content(model=model, contents=prompt, config=config)
+        return _from_plan(resp.parsed) or _from_json(resp.text or "")
+    except Exception as exc:
+        # A model that doesn't support the thinking setting: retry without it.
+        if thinking_level and "think" in str(exc).lower():
+            logger.warning("%s rejected thinking_level=%s, retrying without", model, thinking_level)
+            return _call_model(client, types, model, prompt, "")
+        raise
 
 
 # --- Turning the response into ItineraryDay objects ---------------------------

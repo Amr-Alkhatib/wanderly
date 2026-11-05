@@ -288,40 +288,19 @@ def destination(request: HttpRequest, slug: str) -> HttpResponse:
     from web.views_saved import get_saved_trip_map
     saved_trip_map = get_saved_trip_map(request.user)
 
-    # --- AI itinerary (only when explicitly requested via ?itinerary=1) ---
+    # --- AI itinerary --------------------------------------------------------
+    # The page never waits for Gemini. With ?itinerary=1 it shows a cached
+    # itinerary straight away, or marks it as pending so the page's script
+    # fetches it from `itinerary_fragment` after the page has loaded.
+    itinerary_days = _itinerary_days(request)
     itinerary = None
-    trip_summary = None
-    itinerary_error = None
-    try:
-        itinerary_days = int(request.GET.get("days", 3))
-    except (TypeError, ValueError):
-        itinerary_days = 3
-    itinerary_days = max(1, min(10, itinerary_days))
-
+    itinerary_pending = False
     if request.GET.get("itinerary"):
-        from intelligence.itinerary import build_itinerary
-        itinerary = build_itinerary(city, itinerary_days)
-        if itinerary:
-            total_cost = sum(
-                d.morning_cost + d.afternoon_cost + d.evening_cost for d in itinerary
-            )
-            activity_count = sum(
-                1 for d in itinerary
-                for a in (d.morning, d.afternoon, d.evening) if a
-            )
-            trip_summary = {
-                "days": len(itinerary),
-                "activities": activity_count,
-                "total_cost": total_cost,
-            }
-            if latest_cost:
-                trip_summary["budget_low"] = latest_cost.daily_budget_eur * itinerary_days
-                trip_summary["budget_high"] = latest_cost.daily_midrange_eur * itinerary_days
-        else:
-            itinerary = None
-            itinerary_error = (
-                "Couldn't generate an itinerary right now — please try again."
-            )
+        from intelligence.itinerary import cached_itinerary
+        itinerary = cached_itinerary(city, itinerary_days)
+        itinerary_pending = itinerary is None
+    trip_summary = _trip_summary(itinerary, latest_cost, itinerary_days)
+    itinerary_error = None
 
     context = {
         "saved_trip_map_json": json.dumps(saved_trip_map),
@@ -340,8 +319,72 @@ def destination(request: HttpRequest, slug: str) -> HttpResponse:
         "itinerary_days": itinerary_days,
         "trip_summary": trip_summary,
         "itinerary_error": itinerary_error,
+        "itinerary_pending": itinerary_pending,
     }
     return render(request, "core/destination.html", context)
+
+
+def _itinerary_days(request: HttpRequest) -> int:
+    try:
+        days = int(request.GET.get("days", 3))
+    except (TypeError, ValueError):
+        days = 3
+    return max(1, min(10, days))
+
+
+def _trip_summary(itinerary, latest_cost, days: int) -> dict | None:
+    if not itinerary:
+        return None
+    summary = {
+        "days": len(itinerary),
+        "activities": sum(
+            1 for d in itinerary for a in (d.morning, d.afternoon, d.evening) if a
+        ),
+        "total_cost": sum(
+            d.morning_cost + d.afternoon_cost + d.evening_cost for d in itinerary
+        ),
+    }
+    if latest_cost:
+        summary["budget_low"] = latest_cost.daily_budget_eur * days
+        summary["budget_high"] = latest_cost.daily_midrange_eur * days
+    return summary
+
+
+def itinerary_fragment(request: HttpRequest, slug: str) -> HttpResponse:
+    """Generate (or fetch from cache) the itinerary and return just its HTML.
+
+    Called by the destination page's script, so a slow Gemini call never
+    blocks the page itself. The X-Itinerary-Seconds header shows how long
+    generation took, which helps diagnose slow hosts.
+    """
+    import time
+
+    from intelligence.itinerary import build_itinerary
+
+    city = get_object_or_404(City.objects.select_related("country"), slug=slug)
+    days = _itinerary_days(request)
+    latest_cost = city.cost_snapshots.order_by("-captured_at").first()
+
+    started = time.monotonic()
+    itinerary = build_itinerary(city, days)
+    seconds = time.monotonic() - started
+
+    context = {
+        "city": city,
+        "latest_cost": latest_cost,
+        "itinerary": itinerary or None,
+        "itinerary_days": days,
+        "trip_summary": _trip_summary(itinerary, latest_cost, days),
+        "itinerary_error": None if itinerary else (
+            "Couldn't generate an itinerary right now. Please try again."
+        ),
+    }
+    response = render(request, "core/_itinerary.html", context)
+    response["X-Itinerary-Seconds"] = f"{seconds:.1f}"
+    response["Cache-Control"] = "no-store"
+    if not itinerary:
+        response.status_code = 503
+    return response
 
 
 def compare(request: HttpRequest) -> HttpResponse:

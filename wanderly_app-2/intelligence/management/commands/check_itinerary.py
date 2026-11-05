@@ -57,24 +57,20 @@ class Command(BaseCommand):
         )
         self.stdout.write(f"City                 : {target.name}, {target.country.name}\n")
 
+        self.stdout.write(f"Thinking level       : {itinerary.THINKING_LEVEL or 'model default'}\n")
         client = genai.Client(api_key=key, http_options=types.HttpOptions(timeout=30_000))
-        config = types.GenerateContentConfig(
-            response_mime_type="application/json", response_schema=itinerary._Plan
-        )
         for model in itinerary.GEMINI_MODELS:
             started = time.monotonic()
             try:
-                resp = client.models.generate_content(model=model, contents=prompt, config=config)
+                parsed = itinerary._call_model(client, types, model, prompt, itinerary.THINKING_LEVEL)
                 took = time.monotonic() - started
-                parsed = itinerary._from_plan(resp.parsed) or itinerary._from_json(resp.text or "")
                 if parsed:
                     self.stdout.write(self.style.SUCCESS(
                         f"OK   {model}: {took:.1f}s, {len(parsed)} days, "
                         f"day 1 = {parsed[0].title!r}"))
                 else:
                     self.stdout.write(self.style.WARNING(
-                        f"BAD  {model}: {took:.1f}s, answer could not be read: "
-                        f"{(resp.text or '')[:300]!r}"))
+                        f"BAD  {model}: {took:.1f}s, the answer could not be read"))
             except Exception as exc:
                 took = time.monotonic() - started
                 self.stdout.write(self.style.ERROR(f"FAIL {model}: {took:.1f}s, {exc!r}"[:600]))

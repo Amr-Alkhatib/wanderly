@@ -1969,3 +1969,16 @@ main { flex: 1 0 auto; }
 }
 @keyframes itin-spin { to { transform: rotate(360deg); } }
 .itin-loading p { color: var(--navy); font-weight: 600; font-size: 16px; }
+/* Itinerary loading inline (fetched after the page loads) */
+.cp-placeholder-state .itin-spinner { margin: 0 auto 12px; }
+.itin-retry {
+  margin-top: 12px;
+  padding: 8px 18px;
+  border: none;
+  border-radius: 8px;
+  background: var(--orange);
+  color: #fff;
+  font-weight: 600;
+  cursor: pointer;
+}
+.itin-retry:hover { background: var(--orange-deep); }
