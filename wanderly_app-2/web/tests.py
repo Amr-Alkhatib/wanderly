@@ -70,3 +70,55 @@ class ItineraryFlowTests(TestCase):
             resp = self.client.get(self.fragment + "?days=5")
         self.assertEqual(resp.status_code, 503)
         self.assertContains(resp, "itin-retry", status_code=503)
+
+
+@override_settings(STORAGES={
+    "default": {"BACKEND": "django.core.files.storage.FileSystemStorage"},
+    "staticfiles": {"BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage"},
+})
+class HomePageTests(TestCase):
+    def setUp(self):
+        pt = Country.objects.create(name="Portugal", region=Region.EUROPE)
+        city = City.objects.create(
+            country=pt, name="Lisbon", primary_category=ActivityCategory.CITY,
+            budget_tier=BudgetTier.BUDGET,
+        )
+        CostSnapshot.objects.create(city=city, daily_budget_eur=40, daily_midrange_eur=80,
+                                    daily_luxury_eur=160, captured_at=timezone.now())
+
+    def test_daily_cost_is_shown_in_euros(self):
+        resp = self.client.get(reverse("home"))
+        self.assertContains(resp, "€40/day")
+        self.assertNotContains(resp, "$40/day")
+
+    def test_category_tiles_match_the_category_they_filter_by(self):
+        resp = self.client.get(reverse("home"))
+        self.assertContains(resp, '?category=cultural">Culture</a>', html=False)
+        self.assertNotContains(resp, ">History</a>")
+
+
+class DeploymentSettingsTests(TestCase):
+    """Settings must refuse the public fallback key once DEBUG is off."""
+
+    def _load_settings(self, **env):
+        import os
+        import subprocess
+        import sys
+        from pathlib import Path
+
+        clean = {k: v for k, v in os.environ.items() if not k.startswith("DJANGO_")}
+        clean.update(env)
+        return subprocess.run(
+            [sys.executable, "-c", "import wanderly.settings"],
+            cwd=Path(__file__).resolve().parent.parent, env=clean,
+            capture_output=True, text=True,
+        )
+
+    def test_debug_off_without_secret_key_fails_loudly(self):
+        result = self._load_settings(DJANGO_DEBUG="0")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("DJANGO_SECRET_KEY is not set", result.stderr)
+
+    def test_debug_off_with_secret_key_loads(self):
+        result = self._load_settings(DJANGO_DEBUG="0", DJANGO_SECRET_KEY="x" * 50)
+        self.assertEqual(result.returncode, 0, result.stderr)

@@ -57,7 +57,7 @@ python manage.py runserver
 
 Visit http://127.0.0.1:8000/.
 
-Run the tests (27 tests covering the engine, the comparison logic, the itinerary and the destination page):
+Run the tests (31 tests covering the engine, the comparison logic, the itinerary, the destination and home pages, and the deployment settings):
 
 ```bash
 python manage.py test
@@ -71,8 +71,8 @@ Security-sensitive and environment-specific values are read from the environment
 
 | Variable | Default | Purpose |
 | --- | --- | --- |
-| `DJANGO_SECRET_KEY` | insecure dev key | **Set a real value in production.** |
-| `DJANGO_DEBUG` | `True` | `0` in production. |
+| `DJANGO_SECRET_KEY` | insecure dev key | **Required in production.** With `DJANGO_DEBUG=0` the app refuses to start without it. |
+| `DJANGO_DEBUG` | `True` | `0` in production. A warning is logged if debug is on for a public host. |
 | `DJANGO_ALLOWED_HOSTS` | `localhost,127.0.0.1` | Comma-separated. |
 | `DJANGO_DB_ENGINE` | `sqlite3` | Set `postgresql` to use Postgres. |
 | `DJANGO_DB_*` | — | Name/User/Password/Host/Port for Postgres. |

@@ -23,7 +23,8 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 
 
-import os, dj_database_url
+import os, warnings, dj_database_url
+from django.core.exceptions import ImproperlyConfigured
 
 
 def _env_bool(name: str, default: bool) -> bool:
@@ -38,10 +39,8 @@ def _env_bool(name: str, default: bool) -> bool:
 
 # In production, SECRET_KEY MUST be supplied via the environment. The
 # insecure fallback exists only so local development works out of the box.
-SECRET_KEY = os.environ.get(
-    "DJANGO_SECRET_KEY",
-    "django-insecure-local-dev-only-CHANGE-ME-in-production",
-)
+_DEV_SECRET_KEY = "django-insecure-local-dev-only-CHANGE-ME-in-production"
+SECRET_KEY = os.environ.get("DJANGO_SECRET_KEY", _DEV_SECRET_KEY)
 
 DEBUG = _env_bool("DJANGO_DEBUG", default=True)
 
@@ -50,6 +49,23 @@ ALLOWED_HOSTS = [
     for h in os.environ.get("DJANGO_ALLOWED_HOSTS", "localhost,127.0.0.1").split(",")
     if h.strip()
 ]
+
+# Guard rails for deployments. The fallback key is public (it is in this
+# repository), so a server with DEBUG off must bring its own key, and debug
+# pages must never be served on a public host.
+_LOCAL_HOSTS = {"localhost", "127.0.0.1", "[::1]", "0.0.0.0"}
+if not DEBUG and SECRET_KEY == _DEV_SECRET_KEY:
+    raise ImproperlyConfigured(
+        "DJANGO_SECRET_KEY is not set. Generate one with "
+        "`python -c \"import secrets; print(secrets.token_urlsafe(50))\"` "
+        "and set it in the server environment."
+    )
+if DEBUG and any(h not in _LOCAL_HOSTS for h in ALLOWED_HOSTS):
+    warnings.warn(
+        "DEBUG is on while serving a public host. Set DJANGO_DEBUG=0 in production.",
+        RuntimeWarning,
+        stacklevel=1,
+    )
 
 # CSRF trusted origins (needed once served behind a domain / HTTPS proxy).
 CSRF_TRUSTED_ORIGINS = [
