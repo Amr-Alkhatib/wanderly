@@ -19,7 +19,7 @@ services:
       db:
         condition: service_healthy
     environment:
-      DJANGO_DEBUG: "1"
+      DJANGO_DEBUG: "0"
       DJANGO_SECRET_KEY: "change-me-in-real-deployments"
       DJANGO_ALLOWED_HOSTS: "localhost,127.0.0.1"
       DJANGO_DB_ENGINE: "postgresql"
