@@ -1,58 +1,142 @@
-{% load static %}
-<!DOCTYPE html>
+{% load static %}<!DOCTYPE html>
 <html lang="en">
 <head>
-{% load static %}
-<link rel="icon" type="image/png" href="{% static 'images/wanderly-logo.png' %}" />
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <title>{% block title %}Wanderly — Discover More. Travel Deeper.{% endblock %}</title>
-  {% csrf_token %}
+  <meta name="description" content="Wanderly ranks destinations by budget, safety, climate and interests, and shows how every score is built." />
+  <meta name="theme-color" content="#0B2230" />
   <meta name="csrf-token" content="{{ csrf_token }}">
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="icon" type="image/png" href="{% static 'images/wanderly-logo.png' %}" />
+  <link rel="preload" href="{% static 'fonts/bricolage-grotesque-latin-standard-normal.woff2' %}" as="font" type="font/woff2" crossorigin />
+  <script>
+    /* Motion flags are set before first paint so animated elements never flash.
+       If the motion scripts fail to load, the timeout below shows everything. */
+    (function (d) {
+      var h = d.documentElement;
+      h.classList.add('js');
+      try {
+        if (!matchMedia('(prefers-reduced-motion: reduce)').matches) {
+          h.classList.add('motion-ok');
+          if (sessionStorage.getItem('w:pt')) h.classList.add('pt-arrive');
+        }
+        sessionStorage.removeItem('w:pt');
+      } catch (e) {}
+      setTimeout(function () { if (!window.__wanderly) h.classList.remove('motion-ok'); }, 3500);
+    })(document);
+  </script>
   <link rel="stylesheet" href="{% static 'css/styles.css' %}" />
-<link rel="stylesheet" href="{% static 'css/auth.css' %}" />
+  <link rel="stylesheet" href="{% static 'css/place.css' %}" />
+  <link rel="stylesheet" href="{% static 'css/auth.css' %}" />
+  <script defer src="{% static 'vendor/gsap/gsap.min.js' %}"></script>
+  <script defer src="{% static 'vendor/gsap/ScrollTrigger.min.js' %}"></script>
+  <script defer src="{% static 'vendor/gsap/SplitText.min.js' %}"></script>
+  <script defer src="{% static 'vendor/gsap/Flip.min.js' %}"></script>
+  <script defer src="{% static 'vendor/gsap/CustomEase.min.js' %}"></script>
+  <script defer src="{% static 'vendor/lenis/lenis.min.js' %}"></script>
+  <script defer src="{% static 'js/wanderly/contours.js' %}"></script>
+  <script defer src="{% static 'js/wanderly/bits.js' %}"></script>
+  <script defer src="{% static 'js/wanderly/motion.js' %}"></script>
+  <script defer src="{% static 'js/wanderly/enhance.js' %}"></script>
 </head>
-<body>
+<body class="{% block body_class %}{% endblock %}">
+{% csrf_token %}
+<a class="skip-link" href="#main">Skip to content</a>
 
-<nav class="navbar">
-  <div class="nav-inner">
-    <a href="{% url 'home' %}" class="brand">
-      <img src="{% static 'images/wanderly-logo.png' %}" alt="Wanderly" class="brand-logo" />
-      <span class="brand-word">Wanderly</span>
+<header class="site-nav" data-nav>
+  <nav class="nav-bar navbar" aria-label="Main">
+    <a href="{% url 'home' %}" class="brand" aria-label="Wanderly home">
+      <svg class="brand-logo" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 22s7-7.2 7-12.5a7 7 0 0 0-14 0C5 14.8 12 22 12 22z"/><path class="river" d="M9.6 17c1.8-1.5.8-3 2.8-4.2 1.3-.8 2.5-.6 3.3-1.6"/></svg>
+      <span class="brand-word">wanderly</span>
     </a>
 
     <ul class="nav-links">
-      <li><a href="{% url 'home' %}" {% if request.resolver_match.url_name == 'home' %}class="active"{% endif %}>Discover</a></li>
-      <li><a href="{% url 'compare' %}" {% if request.resolver_match.url_name == 'compare' %}class="active"{% endif %}>Compare</a></li>
-      <li><a href="{% url 'saved' %}" {% if request.resolver_match.url_name == 'saved' %}class="active"{% endif %}>Saved</a></li>
+      <li><a href="{% url 'home' %}" {% if request.resolver_match.url_name == 'home' %}class="active" aria-current="page"{% endif %}>Discover</a></li>
+      <li><a href="{% url 'compare' %}" {% if request.resolver_match.url_name == 'compare' %}class="active" aria-current="page"{% endif %}>Compare</a></li>
+      <li><a href="{% url 'saved' %}" {% if request.resolver_match.url_name == 'saved' %}class="active" aria-current="page"{% endif %}>Saved</a></li>
     </ul>
 
     <form class="nav-search" action="{% url 'search' %}" method="get" role="search">
-      <input type="text" name="q" placeholder="Search destinations..." aria-label="Search destinations" />
+      <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.6-3.6"/></svg>
+      <input type="text" name="q" placeholder="Search destinations" aria-label="Search destinations" />
+      <kbd aria-hidden="true">/</kbd>
     </form>
 
-    <a href="{% url 'search' %}" class="nav-cta">Plan a Trip</a>
-        {% if user.is_authenticated %}
-  <a href="{% url 'account' %}" class="nav-avatar" title="{{ user.email }}">{{ user.email|first|upper }}</a>
-  <a href="{% url 'logout' %}" style="color:var(--text-muted);font-size:13px;margin-left:8px;">Logout</a>
-{% else %}
-  <a href="{% url 'login' %}" class="nav-cta" style="margin-left:8px;">Log in</a>
-{% endif %}
-  </div>
-</nav>
+    <div class="nav-actions">
+      <a href="{% url 'search' %}" class="nav-cta" data-magnet>Plan a trip</a>
+      {% if user.is_authenticated %}
+        <a href="{% url 'account' %}" class="nav-avatar" title="{{ user.email }}" aria-label="Your account">{{ user.email|first|upper }}</a>
+        <a href="{% url 'logout' %}" class="nav-logout">Log out</a>
+      {% else %}
+        <a href="{% url 'login' %}" class="nav-login">Log in</a>
+      {% endif %}
+    </div>
 
-<main>
+    <button type="button" class="nav-menu-btn" aria-expanded="false" aria-controls="nav-sheet" aria-label="Open menu">
+      <span></span><span></span>
+    </button>
+    <span class="nav-progress" aria-hidden="true"></span>
+  </nav>
+</header>
+
+<div class="nav-sheet" id="nav-sheet" data-lenis-prevent>
+  <form class="nav-sheet-search" action="{% url 'search' %}" method="get" role="search">
+    <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.6-3.6"/></svg>
+    <input type="text" name="q" placeholder="Search a country or city" aria-label="Search destinations" />
+  </form>
+  <ul class="nav-sheet-links">
+    <li><a href="{% url 'home' %}">Discover</a></li>
+    <li><a href="{% url 'search' %}">Explore all</a></li>
+    <li><a href="{% url 'compare' %}">Compare</a></li>
+    <li><a href="{% url 'saved' %}">Saved</a></li>
+    {% if user.is_authenticated %}
+      <li><a href="{% url 'account' %}">Account</a></li>
+    {% endif %}
+  </ul>
+  <div class="nav-sheet-foot">
+    {% if user.is_authenticated %}
+      <span class="nav-sheet-user">{{ user.email }}</span>
+      <a href="{% url 'logout' %}" class="btn btn-ghost-dark">Log out</a>
+    {% else %}
+      <a href="{% url 'login' %}" class="btn btn-primary">Log in</a>
+      <a href="{% url 'signup' %}" class="btn btn-ghost-dark">Create account</a>
+    {% endif %}
+  </div>
+</div>
+
+<main id="main">
   {% block content %}{% endblock %}
 </main>
 
 <footer class="footer">
-  <div class="footer-inner">
-    <span class="footer-brand">wanderly</span>
-    <span class="footer-tag">Discover More. Travel Deeper.</span>
-    <span class="footer-meta">© 2026 Wanderly · TUM Project Work</span>
+  <canvas class="footer-contours" data-contours="static" data-contour-tone="dark" aria-hidden="true"></canvas>
+  <div class="footer-inner wrap">
+    <div class="footer-top">
+      <p class="footer-statement">Discover more.<br />Travel deeper.</p>
+      <nav class="footer-links" aria-label="Footer">
+        <a href="{% url 'home' %}">Discover</a>
+        <a href="{% url 'search' %}">Explore all destinations</a>
+        <a href="{% url 'compare' %}">Compare</a>
+        <a href="{% url 'saved' %}">Saved trips</a>
+        {% if user.is_authenticated %}
+          <a href="{% url 'account' %}">Account</a>
+        {% else %}
+          <a href="{% url 'login' %}">Log in</a>
+        {% endif %}
+      </nav>
+    </div>
+    <div class="footer-word" aria-hidden="true">wanderly</div>
+    <div class="footer-bottom">
+      <span class="footer-meta">© 2026 Wanderly · TUM Project Work</span>
+      <span class="footer-tag">Scores are computed, never generated.</span>
+    </div>
   </div>
 </footer>
 
+<div class="pt" aria-hidden="true">
+  <svg class="pt-pin" viewBox="0 0 24 24"><path d="M12 22s7-7.2 7-12.5a7 7 0 0 0-14 0C5 14.8 12 22 12 22z"/><path class="pt-river" d="M9.6 17c1.8-1.5.8-3 2.8-4.2 1.3-.8 2.5-.6 3.3-1.6"/></svg>
+</div>
+
+{% block scripts %}{% endblock %}
 </body>
 </html>

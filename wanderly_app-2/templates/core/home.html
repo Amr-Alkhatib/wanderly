@@ -2,77 +2,110 @@
 {% load static %}
 
 {% block title %}Wanderly — Where will you go next?{% endblock %}
+{% block body_class %}page-home{% endblock %}
 
 {% block content %}
 
 <!-- ===== Hero ===== -->
-<section class="hero">
-  <div class="hero-inner">
-    <div class="hero-logo">
-      <img src="{% static 'images/wanderly-logo.png' %}" alt="Wanderly" />
-    </div>
+<section class="hero grain" aria-labelledby="hero-title">
+  <canvas class="hero-contours" data-contours="live" data-contour-tone="dark" aria-hidden="true"></canvas>
+  <div class="hero-inner wrap">
     <div class="hero-copy">
-      <h1>Where will you go next?</h1>
-      <p class="hero-sub">Data-driven destination discovery — no social media noise</p>
+      <h1 id="hero-title" data-split="chars">Where will you go next?</h1>
+      <p class="hero-sub" data-blur>Destinations ranked by budget, safety, climate and the things you love to do, with every score broken down so you can see why.</p>
 
-      <form class="hero-search" action="{% url 'search' %}" method="get" role="search">
-        <input type="text" name="q" placeholder="Search country or city..."
+      <form class="hero-search" action="{% url 'search' %}" method="get" role="search" data-hero>
+        <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.6-3.6"/></svg>
+        <input type="text" name="q" placeholder="Search a country or city"
                aria-label="Search country or city" />
         <button type="submit">Search</button>
       </form>
 
-      <div class="hero-pills">
+      <div class="hero-pills" data-hero>
+        <span class="hero-pills-label">Jump to</span>
         {% for sc in suggestion_pills|slice:":6" %}
           <a class="hero-pill" href="{% url 'destination' sc.city.slug %}">{{ sc.city.name }}</a>
         {% endfor %}
       </div>
     </div>
+
+    {% if featured %}
+    <aside class="rank-card" data-spotlight aria-labelledby="rank-title">
+      <div class="orbit" aria-hidden="true">
+        <svg class="orbit-text" viewBox="0 0 128 128">
+          <defs><path id="orbit-path" d="M64,64 m-47,0 a47,47 0 1,1 94,0 a47,47 0 1,1 -94,0"/></defs>
+          <text><textPath href="#orbit-path" textLength="292" lengthAdjust="spacing">discover more  •  travel deeper  •</textPath></text>
+        </svg>
+        <span class="orbit-core"><svg class="pin-mark" viewBox="0 0 24 24"><path d="M12 22s7-7.2 7-12.5a7 7 0 0 0-14 0C5 14.8 12 22 12 22z"/><path class="river" d="M9.6 17c1.8-1.5.8-3 2.8-4.2 1.3-.8 2.5-.6 3.3-1.6"/></svg></span>
+      </div>
+      <header class="rank-card-head">
+        <div>
+          <h2 class="rank-card-title" id="rank-title">Ranked right now</h2>
+          <p class="rank-card-note">for a mid-range traveller who wants it safe, with culture, food and nature</p>
+        </div>
+      </header>
+      <ol class="rank-list">
+        {% for sc in featured|dictsortreversed:"score"|slice:":5" %}
+        <li>
+          <a class="rank-row" href="{% url 'destination' sc.city.slug %}" title="{{ sc.explain }}">
+            <span class="rank-n">{{ forloop.counter }}</span>
+            <span class="rank-name"><b>{{ sc.city.name }}</b><small>{{ sc.city.country.name }}</small></span>
+            {% include "core/_strata.html" with sc=sc dark=True %}
+            <span class="rank-score" aria-label="{{ sc.score }} out of 100" data-count>{{ sc.score }}</span>
+          </a>
+        </li>
+        {% endfor %}
+      </ol>
+      <div class="legend">
+        <span><i class="k-budget"></i>Budget</span>
+        <span><i class="k-safety"></i>Safety</span>
+        <span><i class="k-climate"></i>Climate</span>
+        <span><i class="k-interests"></i>Interests</span>
+      </div>
+    </aside>
+    {% endif %}
   </div>
 </section>
+
+<!-- ===== Destination names, moving with the scroll ===== -->
+{% if suggestion_pills %}
+<section class="marquee" data-velocity aria-label="More destinations">
+  <div class="marquee-row" data-speed="55">
+    <div class="marquee-item">
+      {% for sc in suggestion_pills %}
+        <a href="{% url 'destination' sc.city.slug %}">{{ sc.city.name }}</a>
+        <svg class="marquee-pin" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 22s7-7.2 7-12.5a7 7 0 0 0-14 0C5 14.8 12 22 12 22z"/><path class="river" d="M9.6 17c1.8-1.5.8-3 2.8-4.2 1.3-.8 2.5-.6 3.3-1.6"/></svg>
+      {% endfor %}
+    </div>
+  </div>
+  <div class="marquee-row is-outline" data-speed="40" aria-hidden="true">
+    <div class="marquee-item">
+      {% for sc in suggestion_pills reversed %}
+        <a href="{% url 'country_profile' sc.city.country.slug %}" tabindex="-1">{{ sc.city.country.name }}</a>
+        <svg class="marquee-pin" viewBox="0 0 24 24"><path d="M12 22s7-7.2 7-12.5a7 7 0 0 0-14 0C5 14.8 12 22 12 22z"/><path class="river" d="M9.6 17c1.8-1.5.8-3 2.8-4.2 1.3-.8 2.5-.6 3.3-1.6"/></svg>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+{% endif %}
 
 <div class="page">
 
   <!-- ===== Featured Destinations ===== -->
-  <section class="section">
+  <section class="section" aria-labelledby="featured-title">
     <div class="section-head">
-      <h2 class="section-title">Featured Destinations</h2>
-      <a class="view-all" href="{% url 'search' %}">View all →</a>
+      <div>
+        <h2 class="section-title" id="featured-title" data-split>Featured destinations</h2>
+        <p class="section-lede">Hand-picked places, scored exactly like everywhere else. The ring is the score; the bar shows what it is made of.</p>
+      </div>
+      <a class="view-all" href="{% url 'search' %}">View all
+        <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
     </div>
 
     <div class="featured-grid">
       {% for sc in featured %}
-      <div class="dest-card-wrap">
-        <a class="dest-card" href="{% url 'country_profile' sc.city.country.slug %}">
-        <div class="dest-card-img">
-          <img src="{% static 'images/dest/' %}{{ sc.city.image_file }}"
-               alt="{{ sc.city.country.name }}"
-               onerror="this.parentNode.classList.add('img-fallback');this.remove();" />
-          <span class="img-fallback-glyph">{{ sc.city.emoji }}</span>
-        </div>
-        <div class="dest-card-body">
-          <div class="dest-card-name">{{ sc.city.country.name }}</div>
-          <div class="dest-card-meta">
-            {{ sc.city.country.get_region_display }}{% if sc.city.safety_label %} · {{ sc.city.safety_label }}{% endif %} · {{ sc.city.budget_symbol }}
-          </div>
-          <div class="dest-card-tags">
-            <span class="score-badge" title="{{ sc.explain }}">{{ sc.score }}/100 <span class="score-info">ⓘ</span></span>
-            {% if sc.city.card_pill %}
-              <span class="pill pill-soft">{{ sc.city.card_pill }}</span>
-            {% endif %}
-            {% if sc.city.get_primary_category_display != sc.city.card_pill %}
-              <span class="pill pill-soft">{{ sc.city.get_primary_category_display }}</span>
-            {% endif %}
-          </div>
-        </div>
-        </a>
-        <button class="trip-save-btn"
-                data-destination="{{ sc.city.slug }}"
-                data-title="{{ sc.city.name }}"
-                onclick="saveTrip(this)"
-                title="Save to trips">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M17 3H7a2 2 0 0 0-2 2v16l7-3 7 3V5a2 2 0 0 0-2-2z"/></svg>
-        </button>
-      </div>
+        {% url 'country_profile' sc.city.country.slug as card_href %}
+        {% include "core/_dest_card.html" with sc=sc href=card_href name=sc.city.country.name %}
       {% empty %}
         <p class="empty-note">No featured destinations yet. Run
           <code>python manage.py seed_demo</code> to populate the demo data.</p>
@@ -83,48 +116,131 @@
   <!-- ===== Top Picks + Plan by Category ===== -->
   <div class="discover-cols">
 
-    <section class="col-main">
-      <h2 class="section-title">Top Picks This Month</h2>
-      <div class="picks-list">
-        {% for sc in top_picks %}
-        <a class="pick-row" href="{% url 'country_profile' sc.city.country.slug %}">
-          <span class="pick-thumb">
-            <img src="{% static 'images/dest/' %}{{ sc.city.image_file }}"
-                 alt="{{ sc.city.country.name }}"
-                 onerror="this.parentNode.classList.add('img-fallback');this.remove();" />
-            <span class="img-fallback-glyph">{{ sc.city.emoji }}</span>
-          </span>
-          <span class="pick-info">
-            <span class="pick-name">{{ sc.city.country.name }}</span>
-            <span class="pick-meta">
-              {% with cost=sc.city.cost_snapshots.first %}{% if cost %}${{ cost.daily_budget_eur }}/day · {% endif %}{% endwith %}{{ sc.city.safety_label }}
-            </span>
-          </span>
-          <span class="pick-score" title="{{ sc.explain }}">→</span>
-        </a>
-        {% endfor %}
+    <section class="col-main" aria-labelledby="picks-title">
+      <div class="section-head">
+        <h2 class="section-title" id="picks-title" data-split>Top picks this month</h2>
       </div>
+      <ol class="picks-list">
+        {% for sc in top_picks %}
+        <li data-reveal>
+          <a class="pick-row" href="{% url 'country_profile' sc.city.country.slug %}" title="{{ sc.explain }}">
+            <span class="pick-rank">{{ forloop.counter }}</span>
+            <span class="pick-thumb">
+              <picture>
+                <source type="image/webp" srcset="{% static 'images/dest/w/' %}{{ sc.city.image_file|cut:'.png' }}.webp" />
+                <img src="{% static 'images/dest/' %}{{ sc.city.image_file }}"
+                     alt="" loading="lazy" decoding="async"
+                     onerror="this.parentNode.classList.add('img-fallback');this.remove();" />
+              </picture>
+              <span class="img-fallback-glyph">{{ sc.city.emoji }}</span>
+            </span>
+            <span class="pick-info">
+              <span class="pick-name">{{ sc.city.country.name }}</span>
+              <span class="pick-meta">
+                {% with cost=sc.city.cost_snapshots.first %}{% if cost %}From €{{ cost.daily_budget_eur }} a day{% if sc.city.safety_label %}, {% endif %}{% endif %}{% endwith %}{{ sc.city.safety_label|lower }}
+              </span>
+            </span>
+            {% include "core/_strata.html" with sc=sc %}
+            <span class="pick-score" aria-label="{{ sc.score }} out of 100" data-count>{{ sc.score }}</span>
+          </a>
+        </li>
+        {% endfor %}
+      </ol>
     </section>
 
-    <section class="col-side">
-      <h2 class="section-title">Plan by Category</h2>
+    <section class="col-side" aria-labelledby="cat-title">
+      <div class="section-head">
+        <h2 class="section-title" id="cat-title" data-split>Plan by category</h2>
+      </div>
       <div class="category-grid">
         {% for label, value, color in category_tiles %}
-            <a class="category-tile" style="background:{{ color }}; background-image: url('{% static 'images/categories/' %}{{ label|lower }}.png'); background-size: cover; background-blend-mode: hard-light;"
-            href="{% url 'search' %}?category={{ value }}">{{ label }}</a>
+          <a class="category-tile" style="--tint: {{ color }};" href="{% url 'search' %}?category={{ value }}" data-reveal>
+            <img src="{% static 'images/categories/w/' %}{{ label|lower }}.webp" alt="" loading="lazy" decoding="async" />
+            <span>{{ label }}</span>
+            <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 17 17 7M8 7h9v9"/></svg>
+          </a>
         {% endfor %}
-      </div>
-
-      <div class="ai-card">
-        <div class="ai-card-label">✦ Wanderly AI Advisor</div>
-        <p>Every score comes with a transparent, per-factor breakdown —
-           we always explain <em>why</em>, not just <em>what</em>.</p>
-        <a href="{% url 'search' %}" class="ai-card-btn">Find my match →</a>
       </div>
     </section>
 
   </div>
 
+</div><!-- /.page -->
+
+<!-- ===== How a score is built: a compass, taken apart by the scroll ===== -->
+{% with top=featured|dictsortreversed:"score"|first %}
+<section class="inside grain" id="how-scores-work" data-inside aria-labelledby="why-title">
+  <div class="inside-stage">
+    <canvas class="inside-contours" data-contours="static" data-contour-tone="dark" data-contour-seed="2026" aria-hidden="true"></canvas>
+    <div class="inside-grid wrap">
+      <div class="inside-copy">
+        <p class="ai-card-label">
+          <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M5.6 18.4l2.1-2.1M16.3 7.7l2.1-2.1"/></svg>
+          Wanderly AI Advisor
+        </p>
+        <h2 id="why-title" data-split>Every score shows its working.</h2>
+        <p class="inside-lede">A score is a few simple parts working together, like a compass.<span class="only-3d"> Scroll to take one apart and see what each piece measures.</span></p>
+        {% if top %}
+        <div class="inside-hold">
+          <button type="button" class="hold-btn" aria-describedby="hold-result">
+            <span class="hold-ring" aria-hidden="true"></span>
+            <span class="hold-label">Hold to find north</span>
+          </button>
+          <button type="button" class="snd-btn" aria-pressed="true" aria-label="Toggle compass sound">
+            <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 5 6 9H3v6h3l5 4V5zM15.5 8.5a5 5 0 0 1 0 7M18.5 5.5a9 9 0 0 1 0 13"/></svg>
+            <span>Sound on</span>
+          </button>
+        </div>
+        <p class="hold-result" id="hold-result" aria-live="polite" hidden>North points to <b>{{ top.city.name }}</b> today, at {{ top.score }}/100. <a href="{% url 'destination' top.city.slug %}">See why</a></p>
+        {% endif %}
+        <a href="{% url 'search' %}" class="btn btn-primary ai-card-btn" data-magnet>Find my match
+          <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
+        <div class="inside-meter" aria-hidden="true"><span>Taken apart</span><i><em></em></i></div>
+      </div>
+
+      <div class="inside-slot">
+        <canvas class="compass-canvas" aria-hidden="true"></canvas>
+      </div>
+
+      <ul class="inside-callouts" aria-label="What a score is made of">
+        <li class="callout">
+          <i class="callout-swatch k-why"></i>
+          <span class="callout-part">Glass crystal</span>
+          <b>The why</b>
+          <p>A plain-language reason for every rank, built from the numbers underneath.</p>
+        </li>
+        <li class="callout">
+          <i class="callout-swatch f-safety"></i>
+          <span class="callout-part">Enamel bezel</span>
+          <b>Safety</b>
+          <p>The latest advisory score, weighted by how much safety matters to you.</p>
+        </li>
+        <li class="callout">
+          <i class="callout-swatch f-interests"></i>
+          <span class="callout-part">Blued-steel needle</span>
+          <b>Interests</b>
+          <p>How much there is to do that matches what you enjoy.</p>
+        </li>
+        <li class="callout">
+          <i class="callout-swatch f-climate"></i>
+          <span class="callout-part">Rose dial</span>
+          <b>Climate</b>
+          <p>What the weather is like in the month you want to travel.</p>
+        </li>
+        <li class="callout">
+          <i class="callout-swatch f-budget"></i>
+          <span class="callout-part">Copper case</span>
+          <b>Budget</b>
+          <p>How a day there compares with what you want to spend.</p>
+        </li>
+      </ul>
+    </div>
+    <svg class="leaders" aria-hidden="true"></svg>
+  </div>
+</section>
+{% endwith %}
+
+<div class="page page-tail">
   {% if user.is_authenticated %}
   <script>
   const _CSRF = document.querySelector('meta[name="csrf-token"]')?.content || '';
@@ -202,4 +318,8 @@
   {% endif %}
 
 </div>
+{% endblock %}
+
+{% block scripts %}
+<script type="module" src="{% static 'js/wanderly/compass.js' %}"></script>
 {% endblock %}

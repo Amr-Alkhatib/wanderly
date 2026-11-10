@@ -2,75 +2,99 @@
 {% load static %}
 
 {% block title %}{{ city.country.name }} · Wanderly{% endblock %}
+{% block body_class %}page-place{% endblock %}
 
 {% block content %}
 
 <!-- HERO -->
-<div class="cp-hero">
-  <div class="cp-hero-inner">
+<header class="cp-hero cp-hero-photo grain">
+  <div class="cp-hero-media">
+    <picture>
+      <source type="image/webp" srcset="{% static 'images/dest/w/' %}{{ city.image_file|cut:'.png' }}.webp" />
+      <img src="{% static 'images/dest/' %}{{ city.image_file }}" alt="" data-parallax="16"
+           onerror="this.closest('.cp-hero-media').classList.add('img-fallback');this.remove();" />
+    </picture>
+  </div>
+  <div class="cp-hero-inner wrap">
     <div class="cp-hero-left">
-      <div class="cp-breadcrumb">
-        <a href="{% url 'home' %}">Discover</a> &rsaquo;
-        <a href="{% url 'search' %}?region={{ city.country.region }}">{{ city.country.get_region_display }}</a> &rsaquo;
-        <a href="{% url 'country_profile' city.country.slug %}">{{ city.country.name }}</a> &rsaquo;
-        <span>{{ city.name }}</span>
-      </div>
-      <h1 class="cp-title">{{ city.name }}</h1>
-      <p class="cp-subtitle">{{ city.country.name }} &middot; {{ city.summary }}</p>
-      <div style="margin-top:14px;">
+      <nav class="cp-breadcrumb" aria-label="Breadcrumb">
+        <a href="{% url 'home' %}">Discover</a>
+        <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg>
+        <a href="{% url 'search' %}?region={{ city.country.region }}">{{ city.country.get_region_display }}</a>
+        <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg>
+        <a href="{% url 'country_profile' city.country.slug %}">{{ city.country.name }}</a>
+        <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg>
+        <span aria-current="page">{{ city.name }}</span>
+      </nav>
+      <h1 class="cp-title" data-split="chars" data-split-now>{{ city.name }}</h1>
+      <p class="cp-subtitle"><span class="cp-subtitle-country">{{ city.country.name }}</span> {{ city.summary }}</p>
+      <div class="cp-hero-actions" data-reveal>
         <button id="destSaveBtn"
                 class="trip-save-btn dest-save-btn-inline"
                 data-destination="{{ city.slug }}"
                 data-title="{{ city.name }}"
                 onclick="saveDestTrip(this)"
                 title="Save to trips">
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M17 3H7a2 2 0 0 0-2 2v16l7-3 7 3V5a2 2 0 0 0-2-2z"/></svg>
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><path d="M17 3H7a2 2 0 0 0-2 2v16l7-3 7 3V5a2 2 0 0 0-2-2z"/></svg>
           <span id="destSaveBtnLabel">Save</span>
         </button>
+        <a class="btn btn-ghost-dark" href="{% url 'compare' %}?city={{ city.slug }}">
+          <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 3 4 7l4 4M4 7h16M16 21l4-4-4-4M20 17H4"/></svg>
+          Compare
+        </a>
       </div>
     </div>
-    <div class="cp-hero-stats">
+    <div class="cp-hero-stats" data-reveal>
+      <div class="cp-stat-card cp-stat-score" data-spotlight>
+        <div class="cp-stat-label">Wanderly score</div>
+        <div class="cp-stat-value"><span data-count>{{ scored.score }}</span><small>/100</small></div>
+        {% include "core/_strata.html" with sc=scored dark=True %}
+      </div>
       {% if latest_safety %}
       <div class="cp-stat-card">
-        <div class="cp-stat-label">Safety Score</div>
-        <div class="cp-stat-value cp-stat-green">{{ latest_safety.safety_score }}/100</div>
+        <div class="cp-stat-label">Safety score</div>
+        <div class="cp-stat-value cp-stat-green"><span data-count>{{ latest_safety.safety_score }}</span><small>/100</small></div>
         <div class="cp-stat-sub">{{ latest_safety.get_level_display }}</div>
       </div>
       {% endif %}
       {% if latest_cost %}
       <div class="cp-stat-card">
-        <div class="cp-stat-label">Cost Level</div>
+        <div class="cp-stat-label">Cost level</div>
         <div class="cp-stat-value cp-stat-orange">{{ city.budget_symbol }}</div>
-        <div class="cp-stat-sub">~€{{ latest_cost.daily_budget_eur }}–{{ latest_cost.daily_midrange_eur }}/day</div>
+        <div class="cp-stat-sub">~€{{ latest_cost.daily_budget_eur }}–{{ latest_cost.daily_midrange_eur }} a day</div>
       </div>
       {% endif %}
     </div>
   </div>
-</div>
+</header>
 
 <!-- INFO BAR -->
-<div class="cp-infobar">
-  <div class="cp-info-card cp-info-orange">
-    <div class="cp-info-label">Language</div>
-    <div class="cp-info-value">{{ city.country.language }}</div>
+<div class="cp-infobar wrap">
+  <div class="cp-info-card cp-info-orange" data-reveal>
+    <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h9M8.5 3v2M6 5c0 4 3 7 6.5 8.5M11 5c-.8 4-3.6 7.6-7 9"/><path d="m12 21 4.5-10L21 21M13.5 18h6"/></svg>
+    <div><div class="cp-info-label">Language</div>
+    <div class="cp-info-value">{{ city.country.language }}</div></div>
   </div>
-  <div class="cp-info-card cp-info-green">
-    <div class="cp-info-label">Currency</div>
-    <div class="cp-info-value">{{ city.country.currency }}</div>
+  <div class="cp-info-card cp-info-green" data-reveal>
+    <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><rect x="2.5" y="6" width="19" height="12" rx="2.5"/><circle cx="12" cy="12" r="2.6"/><path d="M6 9.5v5M18 9.5v5"/></svg>
+    <div><div class="cp-info-label">Currency</div>
+    <div class="cp-info-value">{{ city.country.currency }}</div></div>
   </div>
-  <div class="cp-info-card cp-info-blue">
-    <div class="cp-info-label">Visa</div>
-    <div class="cp-info-value">{{ city.country.visa_summary|truncatechars:20 }}</div>
+  <div class="cp-info-card cp-info-blue" data-reveal>
+    <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="2.5" width="14" height="19" rx="2.5"/><circle cx="12" cy="10" r="3"/><path d="M9 17h6"/></svg>
+    <div><div class="cp-info-label">Visa</div>
+    <div class="cp-info-value cp-info-clamp" title="{{ city.country.visa_summary }}">{{ city.country.visa_summary }}</div></div>
   </div>
-  <div class="cp-info-card cp-info-yellow">
-    <div class="cp-info-label">Budget Tier</div>
-    <div class="cp-info-value">{{ city.get_budget_tier_display }}</div>
+  <div class="cp-info-card cp-info-yellow" data-reveal>
+    <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7h18v12H3zM3 7l2-4h14l2 4M12 11v4M10 13h4"/></svg>
+    <div><div class="cp-info-label">Budget tier</div>
+    <div class="cp-info-value">{{ city.get_budget_tier_display }}</div></div>
   </div>
 </div>
 
 <!-- TAB BAR -->
 <div class="cp-tab-bar-wrapper">
-  <div class="cp-tab-bar">
+  <div class="cp-tab-bar wrap" role="tablist" aria-label="About {{ city.name }}">
     <button class="cp-tab active" data-target="tab-overview">Overview</button>
     <button class="cp-tab" data-target="tab-cost">Cost &amp; Budget</button>
     <button class="cp-tab" data-target="tab-safety">Safety &amp; Practical Info</button>
@@ -81,19 +105,40 @@
 </div>
 
 
-
 <!-- OVERVIEW -->
 <div class="cp-tab-panel active" id="tab-overview">
-  <div class="cp-body">
+  <div class="cp-body wrap">
 
     <div class="cp-main">
 
+      <!-- Why this score? -->
+      <section class="cp-section cp-why-section">
+        <div class="cp-why-head">
+          <h2 class="cp-section-title">Why this score?</h2>
+          <span class="cp-why-score"><b>{{ scored.score }}</b>/100</span>
+        </div>
+        {% if why %}<p class="cp-why-text">{{ why }}</p>{% endif %}
+        <div class="factor-table">
+          {% for f in scored.factors %}
+          <div class="factor-row">
+            <span class="factor-row-name"><i class="factor-dot f-{{ f.name|lower }}"></i>{{ f.name }}</span>
+            <span class="factor-meter" title="{{ f.raw_score|floatformat:0 }}/100 before weighting"><i class="f-{{ f.name|lower }}" style="--v: {{ f.raw_score|stringformat:'.1f' }}"></i></span>
+            <span class="factor-pts"><b>{{ f.points|floatformat:0 }}</b> pts</span>
+            <span class="factor-detail">
+              {{ f.raw_score|floatformat:0 }}/100 at {% widthratio f.weight 1 100 %}% weight. {{ f.detail }}
+              {% if f.is_stale %}<span class="stale-flag" title="Built on data older than its freshness window, so treat it as indicative">⚠ Older data</span>{% endif %}
+            </span>
+          </div>
+          {% endfor %}
+        </div>
+      </section>
+
       <!-- At a Glance -->
-      <div class="cp-section">
-        <h2 class="cp-section-title">At a Glance</h2>
+      <section class="cp-section">
+        <h2 class="cp-section-title">At a glance</h2>
         {% if latest_safety %}
         <div class="cp-bar-row">
-          <span class="cp-bar-label">Safety Score</span>
+          <span class="cp-bar-label">Safety score</span>
           <div class="cp-bar-track">
             <div class="cp-bar-fill cp-bar-green" style="width: {{ latest_safety.safety_score }}%"></div>
           </div>
@@ -102,7 +147,7 @@
         {% endif %}
         {% if latest_cost %}
         <div class="cp-bar-row">
-          <span class="cp-bar-label">Cost Level</span>
+          <span class="cp-bar-label">Cost level</span>
           <div class="cp-bar-track">
             <div class="cp-bar-fill cp-bar-orange" style="width: {{ scored.score }}%"></div>
           </div>
@@ -110,29 +155,29 @@
         </div>
         {% endif %}
         <div class="cp-bar-row">
-          <span class="cp-bar-label">Wanderly Score</span>
+          <span class="cp-bar-label">Wanderly score</span>
           <div class="cp-bar-track">
             <div class="cp-bar-fill cp-bar-navy" style="width: {{ scored.score }}%"></div>
           </div>
           <span class="cp-bar-pct">{{ scored.score }}%</span>
         </div>
-      </div>
-
-      <!-- Why this score? -->
-      {% if why %}
-      <div class="cp-section cp-why-section">
-        <h2 class="cp-section-title">✦ Why this score?</h2>
-        <p class="cp-why-text">{{ why }}</p>
-      </div>
-      {% endif %}
+      </section>
 
       <!-- Best Time to Visit -->
-      <div class="cp-section">
-        <h2 class="cp-section-title">Best Time to Visit</h2>
+      <section class="cp-section">
+        <div class="cp-months-head">
+          <h2 class="cp-section-title">Best time to visit</h2>
+          {% if weather %}
+          <div class="legend"><span><i class="k-budget"></i>Recommended</span><span><i class="k-muted"></i>Average high</span></div>
+          {% endif %}
+        </div>
+        {% if weather %}
         <div class="cp-months">
           {% for w in weather %}
-          <div class="cp-month {% if w.is_recommended_month %}cp-month-active{% endif %}">
-            {% if w.month == 1 %}J{% elif w.month == 2 %}F{% elif w.month == 3 %}M{% elif w.month == 4 %}A{% elif w.month == 5 %}M{% elif w.month == 6 %}J{% elif w.month == 7 %}J{% elif w.month == 8 %}A{% elif w.month == 9 %}S{% elif w.month == 10 %}O{% elif w.month == 11 %}N{% elif w.month == 12 %}D{% endif %}
+          <div class="cp-month {% if w.is_recommended_month %}cp-month-active{% endif %}" title="Average high {{ w.avg_high_c }}°C, low {{ w.avg_low_c }}°C, {{ w.rainfall_mm }} mm of rain">
+            <span class="cp-month-temp">{{ w.avg_high_c }}°</span>
+            <span class="cp-month-track"><i class="cp-month-bar" style="--t: {{ w.avg_high_c }}"></i></span>
+            <span class="cp-month-letter">{% if w.month == 1 %}J{% elif w.month == 2 %}F{% elif w.month == 3 %}M{% elif w.month == 4 %}A{% elif w.month == 5 %}M{% elif w.month == 6 %}J{% elif w.month == 7 %}J{% elif w.month == 8 %}A{% elif w.month == 9 %}S{% elif w.month == 10 %}O{% elif w.month == 11 %}N{% elif w.month == 12 %}D{% endif %}</span>
           </div>
           {% endfor %}
         </div>
@@ -141,17 +186,14 @@
           <p class="cp-climate-note">Climate: {{ w.climate_type }}</p>
           {% endif %}
         {% endfor %}
-      </div>
-
-      <!-- Description -->
-      <div class="cp-section">
-        <p class="cp-desc">{{ city.summary }}</p>
-      </div>
+        {% else %}
+        <p class="cp-empty-note">No monthly weather on file for {{ city.name }} yet.</p>
+        {% endif %}
+      </section>
 
     </div><!-- /.cp-main -->
 
-    <div class="cp-sidebar">
-
+    <aside class="cp-sidebar">
 
       {% if neighborhoods %}
       <div class="cp-sidebar-card">
@@ -164,9 +206,8 @@
       </div>
       {% endif %}
 
-
       <div class="cp-sidebar-card">
-        <h3 class="cp-sidebar-title">Transport Overview</h3>
+        <h3 class="cp-sidebar-title">Transport overview</h3>
         <ul class="cp-transport-list">
           {% for t in transport %}
           <li class="cp-transport-row">{{ t }}</li>
@@ -174,9 +215,8 @@
         </ul>
       </div>
 
-
       <div class="cp-sidebar-card">
-        <h3 class="cp-sidebar-title">Practical Info</h3>
+        <h3 class="cp-sidebar-title">Practical info</h3>
         <div class="cp-practical-table">
           <div class="cp-practical-row"><span class="cp-practical-label">Visa</span><span class="cp-practical-val">{{ city.country.visa_summary }}</span></div>
           <div class="cp-practical-row"><span class="cp-practical-label">Currency</span><span class="cp-practical-val">{{ city.country.currency }}</span></div>
@@ -185,10 +225,9 @@
         </div>
       </div>
 
-
       {% if latest_safety %}
       <div class="cp-sidebar-card">
-        <h3 class="cp-sidebar-title">Safety Notes</h3>
+        <h3 class="cp-sidebar-title">Safety notes</h3>
         <div class="cp-safety-header">
           <span class="cp-safety-score">{{ latest_safety.safety_score }}<span class="cp-safety-max">/100</span></span>
           <span class="cp-safety-level {% if latest_safety.level == 3 %}cp-safety-safe{% elif latest_safety.level == 2 %}cp-safety-moderate{% else %}cp-safety-caution{% endif %}">{{ latest_safety.get_level_display }}</span>
@@ -202,64 +241,79 @@
       </div>
       {% endif %}
 
-      
-      <a href="{% url 'search' %}?region={{ city.country.region }}" class="cp-cta-btn">
-        Plan a Trip to {{ city.country.name }}
-      </a>
-      <a href="#" class="cp-cta-btn cp-cta-outline">
-        Save Destination
-      </a>
+      <div class="cp-cta-stack">
+        <a href="{% url 'search' %}?region={{ city.country.region }}" class="cp-cta-btn" data-magnet>
+          Plan a trip to {{ city.country.name }}
+        </a>
+        <a href="#" class="cp-cta-btn cp-cta-outline">
+          Save destination
+        </a>
+      </div>
 
-    </div>
+    </aside>
 
   </div>
 </div>
 
 <!-- COST & BUDGET -->
 <div class="cp-tab-panel" id="tab-cost">
-  <div class="cp-panel-inner">
-    <div class="cp-body">
+  <div class="cp-panel-inner wrap">
+    <div class="cp-body cp-body-flat">
       <div class="cp-main">
         {% if latest_cost %}
-        <div class="cp-section">
-          <h2 class="cp-section-title">Daily Budget</h2>
-          <div class="info-row"><span class="info-row-label">Budget traveller</span><span class="info-row-value" style="color:#2EB85C;">€{{ latest_cost.daily_budget_eur }}/day</span></div>
-          <div class="info-row"><span class="info-row-label">Mid-range</span><span class="info-row-value" style="color:#f0a500;" >€{{ latest_cost.daily_midrange_eur }}/day</span></div>
-          <div class="info-row"><span class="info-row-label">Luxury</span><span class="info-row-value" style="color:#3380b2;" >€{{ latest_cost.daily_luxury_eur }}/day</span></div>
-        </div>
-        <div class="cp-section">
-          <h2 class="cp-section-title">Typical Costs</h2>
-          <div class="info-row"><span class="info-row-label">Hostel / dorm night</span><span class="info-row-value">€{{ latest_cost.hostel_night_eur }}</span></div>
+        <section class="cp-section">
+          <h2 class="cp-section-title">Daily budget</h2>
+          <div class="cost-tiers">
+            <div class="cost-tier cost-tier-budget">
+              <span class="cost-tier-name">Budget traveller</span>
+              <span class="cost-tier-num">€<b data-count>{{ latest_cost.daily_budget_eur }}</b></span>
+              <span class="cost-tier-unit">a day</span>
+            </div>
+            <div class="cost-tier cost-tier-mid">
+              <span class="cost-tier-name">Mid-range</span>
+              <span class="cost-tier-num">€<b data-count>{{ latest_cost.daily_midrange_eur }}</b></span>
+              <span class="cost-tier-unit">a day</span>
+            </div>
+            <div class="cost-tier cost-tier-lux">
+              <span class="cost-tier-name">Luxury</span>
+              <span class="cost-tier-num">€<b data-count>{{ latest_cost.daily_luxury_eur }}</b></span>
+              <span class="cost-tier-unit">a day</span>
+            </div>
+          </div>
+        </section>
+        <section class="cp-section">
+          <h2 class="cp-section-title">Typical costs</h2>
+          <div class="info-row"><span class="info-row-label">Hostel or dorm, per night</span><span class="info-row-value">€{{ latest_cost.hostel_night_eur }}</span></div>
           <div class="info-row"><span class="info-row-label">Cheap meal</span><span class="info-row-value">€{{ latest_cost.meal_cheap_eur }}</span></div>
-          <div class="info-row"><span class="info-row-label">Local transport / day</span><span class="info-row-value">€{{ latest_cost.local_transport_day_eur }}</span></div>
-        </div>
+          <div class="info-row"><span class="info-row-label">Local transport, per day</span><span class="info-row-value">€{{ latest_cost.local_transport_day_eur }}</span></div>
+        </section>
         {% else %}
-        <div class="cp-section"><p style="color: var(--muted);">No cost data available yet.</p></div>
+        <section class="cp-section"><p class="cp-empty-note">No cost data available yet.</p></section>
         {% endif %}
       </div>
-      <div class="cp-sidebar">
-        <div class="cp-sidebar-card" style="background: #fff3ef; border: 1px solid var(--orange);">
-          <div style="color: var(--orange); font-weight: 700; font-size: 14px; margin-bottom: 8px;">✦ AI Trip Cost Calculator</div>
-          <p style="font-size: 13px; color: var(--muted); line-height: 1.6;">Personalised daily budget estimates based on your travel style — coming soon.</p>
+      <aside class="cp-sidebar">
+        <div class="cp-sidebar-card cp-soon-card" data-spotlight>
+          <div class="cp-soon-label">✦ AI trip cost calculator</div>
+          <p>Personalised daily budget estimates based on your travel style. Coming soon.</p>
         </div>
-      </div>
+      </aside>
     </div>
   </div>
 </div>
 
 <!-- SAFETY & PRACTICAL INFO -->
 <div class="cp-tab-panel" id="tab-safety">
-  <div class="cp-panel-inner">
+  <div class="cp-panel-inner wrap">
     <div class="sp-grid">
 
       <div class="sp-col">
 
         <div class="sp-card">
-          <h3 class="sp-card-title">Safety by Category</h3>
+          <h3 class="sp-card-title">Safety by category</h3>
           {% if latest_safety %}
           <div class="sp-overall-row">
             <span class="sp-overall-score">{{ latest_safety.safety_score }}</span>
-            <span class="sp-overall-label">/ 100 overall score</span>
+            <span class="sp-overall-label">/ 100 overall</span>
             <span class="cp-safety-level {% if latest_safety.level == 3 %}cp-safety-safe{% elif latest_safety.level == 2 %}cp-safety-moderate{% else %}cp-safety-caution{% endif %}">{{ latest_safety.get_level_display }}</span>
           </div>
           {% if latest_safety.advisory_summary %}
@@ -268,30 +322,30 @@
           {% endif %}
           <div class="sp-cat-list">
             <div class="sp-cat-row">
-              <span class="sp-cat-label">Personal Safety</span>
-              <span class="sp-cat-badge sp-badge-green">Low Risk</span>
+              <span class="sp-cat-label">Personal safety</span>
+              <span class="sp-cat-badge sp-badge-green">Low risk</span>
             </div>
             <div class="sp-cat-row">
-              <span class="sp-cat-label">Natural Disasters</span>
+              <span class="sp-cat-label">Natural disasters</span>
               <span class="sp-cat-badge sp-badge-yellow">Moderate</span>
             </div>
             <div class="sp-cat-row">
-              <span class="sp-cat-label">Health &amp; Medical</span>
+              <span class="sp-cat-label">Health &amp; medical</span>
               <span class="sp-cat-badge sp-badge-green">Good</span>
             </div>
             <div class="sp-cat-row">
-              <span class="sp-cat-label">Transport Safety</span>
+              <span class="sp-cat-label">Transport safety</span>
               <span class="sp-cat-badge sp-badge-yellow">Moderate</span>
             </div>
             <div class="sp-cat-row">
-              <span class="sp-cat-label">Scams &amp; Petty Crime</span>
-              <span class="sp-cat-badge sp-badge-red">High Risk</span>
+              <span class="sp-cat-label">Scams &amp; petty crime</span>
+              <span class="sp-cat-badge sp-badge-red">High risk</span>
             </div>
           </div>
         </div>
 
         <div class="sp-card">
-          <h3 class="sp-card-title">Health Information</h3>
+          <h3 class="sp-card-title">Health information</h3>
           {% if latest_safety and latest_safety.health_notes %}
           <p class="sp-advisory">{{ latest_safety.health_notes }}</p>
           {% endif %}
@@ -315,10 +369,10 @@
 
       <div class="sp-col">
         <div class="sp-card">
-          <h3 class="sp-card-title">Visa &amp; Entry</h3>
+          <h3 class="sp-card-title">Visa &amp; entry</h3>
           <div class="sp-visa-hero">
             <span class="sp-visa-days">90</span>
-            <span class="sp-visa-days-label">days visa-free<br>(EU / US / UK — varies by passport)</span>
+            <span class="sp-visa-days-label">days visa-free<br>(EU / US / UK, varies by passport)</span>
           </div>
           {% if city.country.visa_summary %}
           <p class="sp-advisory">{{ city.country.visa_summary }}</p>
@@ -347,7 +401,8 @@
             </li>
           </ul>
           <div class="sp-map-placeholder">
-            <span class="sp-map-label">Visa-free access world map — coming soon</span>
+            <canvas data-contours="static" data-contour-tone="light" data-contour-seed="4242" aria-hidden="true"></canvas>
+            <span class="sp-map-label">Visa-free access world map, coming soon</span>
           </div>
         </div>
       </div>
@@ -356,18 +411,18 @@
       <div class="sp-col">
 
         <div class="sp-risk-card">
-          <h3 class="sp-card-title sp-risk-title">Legally Risky</h3>
+          <h3 class="sp-card-title sp-risk-title">Legally risky</h3>
           <p class="sp-risk-sub">Things to avoid to stay out of trouble</p>
           <ul class="sp-risk-list">
             <li>Public intoxication in certain areas</li>
             <li>Photographing government or military buildings</li>
-            <li>Jaywalking — fines apply in many cities</li>
+            <li>Jaywalking: fines apply in many cities</li>
             <li>Carrying unmarked prescription medication</li>
           </ul>
         </div>
 
         <div class="sp-tips-card">
-          <h3 class="sp-card-title sp-tips-title">Practical Tips</h3>
+          <h3 class="sp-card-title sp-tips-title">Practical tips</h3>
           <ul class="sp-tips-list">
             <li class="sp-tip-item">
               <span class="sp-tick">&#10003;</span>
@@ -389,7 +444,7 @@
         </div>
 
         <div class="sp-emergency-card">
-          <h3 class="sp-emergency-title">Emergency Numbers</h3>
+          <h3 class="sp-emergency-title">Emergency numbers</h3>
           {% for service, number in emergency.items %}
           <div class="sp-emergency-row">
             <span class="sp-emergency-label">{{ service }}</span>
@@ -407,7 +462,7 @@
 
 <!-- LOCAL TIPS -->
 <div class="cp-tab-panel" id="tab-local-tips">
-  <div class="cp-panel-inner">
+  <div class="cp-panel-inner wrap">
 
     <!-- FILTER PILLS -->
     <div class="lt-filter-bar">
@@ -422,51 +477,51 @@
 
       <!--  HIDDEN GEMS -->
       <div class="lt-section">
-        <h2 class="lt-section-title">Hidden Gems</h2>
+        <h2 class="lt-section-title">Hidden gems</h2>
 
         <div class="lt-gem-card" data-category="hidden-gems culture">
-          <div class="lt-gem-img"></div>
+          <div class="lt-gem-img"><canvas data-contours="static" data-contour-tone="light" data-contour-seed="17" aria-hidden="true"></canvas></div>
           <div class="lt-gem-body">
             <span class="lt-category-tag">Culture</span>
             <h3 class="lt-gem-title">Secret Underground Market</h3>
             <p class="lt-gem-desc">A labyrinthine bazaar hidden beneath the old town, known only to locals. Find handmade ceramics, vintage maps, and street-food stalls that have traded here for generations.</p>
-            <a href="#" class="lt-learn-more">Learn more &rarr;</a>
+            <a href="#" class="lt-learn-more">Learn more <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
           </div>
         </div>
 
         <div class="lt-gem-card" data-category="hidden-gems food">
-          <div class="lt-gem-img lt-gem-img--food"></div>
+          <div class="lt-gem-img lt-gem-img--food"><canvas data-contours="static" data-contour-tone="light" data-contour-seed="91" aria-hidden="true"></canvas></div>
           <div class="lt-gem-body">
             <span class="lt-category-tag lt-tag-food">Food</span>
             <h3 class="lt-gem-title">The Fisherman's Breakfast Spot</h3>
-            <p class="lt-gem-desc">Open only 5am–9am, this tiny harborside café serves the freshest catch with local bread — a morning ritual for fishermen since 1942.</p>
-            <a href="#" class="lt-learn-more">Learn more &rarr;</a>
+            <p class="lt-gem-desc">Open only 5am–9am, this tiny harborside café serves the freshest catch with local bread, a morning ritual for fishermen since 1942.</p>
+            <a href="#" class="lt-learn-more">Learn more <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
           </div>
         </div>
 
         <div class="lt-gem-card" data-category="hidden-gems">
-          <div class="lt-gem-img lt-gem-img--nature"></div>
+          <div class="lt-gem-img lt-gem-img--nature"><canvas data-contours="static" data-contour-tone="light" data-contour-seed="303" aria-hidden="true"></canvas></div>
           <div class="lt-gem-body">
             <span class="lt-category-tag lt-tag-nature">Nature</span>
             <h3 class="lt-gem-title">Cliffside Sunset Viewpoint</h3>
-            <p class="lt-gem-desc">A 20-minute hike from the city edge leads to a panoramic cliff with views that rival any postcard — almost never crowded, even in summer.</p>
-            <a href="#" class="lt-learn-more">Learn more &rarr;</a>
+            <p class="lt-gem-desc">A 20-minute hike from the city edge leads to a panoramic cliff with views that rival any postcard, almost never crowded, even in summer.</p>
+            <a href="#" class="lt-learn-more">Learn more <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
           </div>
         </div>
       </div>
 
       <!-- DO'S & DON'TS -->
       <div class="lt-section">
-        <h2 class="lt-section-title">Do's &amp; Don'ts</h2>
+        <h2 class="lt-section-title">Do's &amp; don'ts</h2>
 
         <ul class="lt-dos-list">
           <li class="lt-do" data-category="culture">
             <span class="lt-check">✓</span>
-            <span>Greet shopkeepers with the local phrase — a little effort goes a long way.</span>
+            <span>Greet shopkeepers with the local phrase. A little effort goes a long way.</span>
           </li>
           <li class="lt-do" data-category="culture">
             <span class="lt-check">✓</span>
-            <span>Carry cash for local markets — cards aren't widely accepted.</span>
+            <span>Carry cash for local markets; cards aren't widely accepted.</span>
           </li>
           <li class="lt-do" data-category="culture">
             <span class="lt-check">✓</span>
@@ -482,14 +537,14 @@
           </li>
           <li class="lt-dont" data-category="culture">
             <span class="lt-cross">✕</span>
-            <span>Don't haggle at fixed-price shops — only at open-air markets.</span>
+            <span>Don't haggle at fixed-price shops, only at open-air markets.</span>
           </li>
         </ul>
       </div>
 
       <!-- NON-TOURISTY EXPERIENCES -->
       <div class="lt-section">
-        <h2 class="lt-section-title">Non-Touristy Experiences</h2>
+        <h2 class="lt-section-title">Non-touristy experiences</h2>
 
         <div class="lt-offbeat-card" data-category="off-beat">
           <div class="lt-offbeat-header">
@@ -498,7 +553,6 @@
           </div>
           <div class="lt-offbeat-meta">
             <span>⏱ Best: 7am – 10am</span>
-            <span class="lt-meta-dot">·</span>
             <span>€ Free</span>
           </div>
           <p class="lt-offbeat-desc">Sit with locals playing backgammon over sweet tea at this 60-year-old neighbourhood spot. No English menu, all atmosphere.</p>
@@ -511,7 +565,6 @@
           </div>
           <div class="lt-offbeat-meta">
             <span>⏱ Sundays: 8am – 1pm</span>
-            <span class="lt-meta-dot">·</span>
             <span>€ Free entry</span>
           </div>
           <p class="lt-offbeat-desc">Discover vintage furniture, retro postcards, and handmade goods at this weekly market beloved by artists and antique hunters.</p>
@@ -524,7 +577,6 @@
           </div>
           <div class="lt-offbeat-meta">
             <span>⏱ 3hrs · Evenings</span>
-            <span class="lt-meta-dot">·</span>
             <span>€ ~€25 per person</span>
           </div>
           <p class="lt-offbeat-desc">Cook traditional recipes in a local home, away from tourist-oriented schools. Usually limited to 4–6 guests for an intimate feel.</p>
@@ -538,15 +590,16 @@
 
 <!-- ITINERARY -->
 <div class="cp-tab-panel" id="tab-itinerary">
-  <div class="cp-panel-inner">
-        <div class="itin-head">
-      <h2 class="cp-section-title">✦ AI Itinerary for {{ city.name }}</h2>
+  <div class="cp-panel-inner wrap">
+    <div class="itin-head">
+      <h2 class="cp-section-title">✦ AI itinerary for {{ city.name }}</h2>
+      <p class="itin-head-sub">Pick a trip length. Gemini plans the days from {{ city.name }}'s budget and profile.</p>
     </div>
     <div class="itin-daytabs">
       <a class="itin-daytab {% if itinerary_days == 3 %}active{% endif %}" href="?itinerary=1&days=3#tab-itinerary">3 Days</a>
       <a class="itin-daytab {% if itinerary_days == 5 %}active{% endif %}" href="?itinerary=1&days=5#tab-itinerary">5 Days</a>
       <a class="itin-daytab {% if itinerary_days == 7 %}active{% endif %}" href="?itinerary=1&days=7#tab-itinerary">7 Days</a>
-     <span class="itin-custom">
+      <span class="itin-custom">
         <input type="number" id="itin-custom-days" min="1" max="10" value="{{ itinerary_days }}" aria-label="Custom number of days">
         <button type="button" onclick="itinCustom()">Go</button>
       </span>
@@ -558,7 +611,13 @@
   </div>
 </div>
 
-<div class="itin-loading" id="itin-loading">
+<div class="itin-loading" id="itin-loading" role="status" aria-live="polite">
+  <svg class="itin-route" viewBox="0 0 240 90" aria-hidden="true">
+    <path class="itin-route-line" d="M14 70 C 60 10, 110 10, 128 46 S 196 84, 226 22"/>
+    <circle class="itin-route-a" cx="14" cy="70" r="5"/>
+    <g class="itin-route-pin" transform="translate(214 4)"><path d="M12 22s7-7.2 7-12.5a7 7 0 0 0-14 0C5 14.8 12 22 12 22z"/></g>
+    <g class="itin-plane"><path d="M-7 0 L7 0 M2 -5 L7 0 L2 5" /><animateMotion dur="2.6s" repeatCount="indefinite" rotate="auto" keyPoints="0;1" keyTimes="0;1" calcMode="spline" keySplines=".45 0 .55 1" path="M14 70 C 60 10, 110 10, 128 46 S 196 84, 226 22"/></g>
+  </svg>
   <div class="itin-spinner"></div>
   <p>Generating your itinerary…</p>
 </div>
@@ -635,7 +694,7 @@
 
 <!-- TRANSPORT -->
 <div class="cp-tab-panel" id="tab-transport">
-  <div class="cp-panel-inner">
+  <div class="cp-panel-inner wrap">
     <div class="cp-placeholder-state">
       <div class="cp-placeholder-icon">✈️</div>
       <h3>Transport</h3>

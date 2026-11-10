@@ -44,6 +44,18 @@ The LLM is **never** the ranker. It is an optional presentation layer on top of 
 
 ---
 
+## Frontend
+
+Still Django templates, no build step and no frontend framework. The motion layer is plain JavaScript in `static/js/wanderly/`, and every library is vendored under `static/vendor/` so the site works offline and behind strict hosts.
+
+- **GSAP** (ScrollTrigger, SplitText, Flip, CustomEase) and **Lenis** run on one clock: GSAP's ticker drives smooth scrolling, scroll triggers and the 3D frame.
+- **React Bits**, ported to vanilla JS in `bits.js`: SplitText, BlurText, CountUp, ScrollVelocity, TiltedCard, SpotlightCard, Magnet, ClickSpark, DecryptedText, CircularText.
+- **Contour field** (`contours.js`): topographic lines from simplex noise and marching squares. On the home hero the cursor raises the summit.
+- **The compass** (`compass.js`, three.js): a pocket compass built entirely from code, lit by a small studio baked into the environment. Scrolling takes it apart on camera, and each part is one piece of a score: copper case for budget, enamel bezel for safety, rose dial for climate, blued-steel needle for interests, glass crystal for the explanation. Hold the button to spin the needle; it settles on north and names today's top match.
+- **Strata bars** show every score split into its four factor contributions, wherever a score appears.
+- Visitors who prefer reduced motion get the finished page, phones keep native scrolling, and without WebGL the compass section falls back to a plain list.
+- Destination photos are served as WebP from `static/images/dest/w/`, with the original PNGs as the fallback.
+
 ## Quick start (local, zero config)
 
 ```bash

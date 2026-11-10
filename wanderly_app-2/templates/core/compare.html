@@ -2,30 +2,51 @@
 {% load static %}
 
 {% block title %}Compare Destinations · Wanderly{% endblock %}
+{% block body_class %}page-compare{% endblock %}
 
 {% block content %}
-<div class="page cmp-page">
-
-  <div class="cmp-head">
-    <a href="{% url 'home' %}" class="cmp-back" aria-label="Back">←</a>
-    <h1 class="cmp-title">Compare Destinations</h1>
-    <a href="#cmp-picker" class="cmp-add-btn">+ Add destination</a>
+<section class="page-head grain">
+  <canvas class="page-head-contours" data-contours="static" data-contour-tone="dark" aria-hidden="true"></canvas>
+  <div class="wrap page-head-inner">
+    <div>
+      <div class="cmp-head">
+        <a href="{% url 'home' %}" class="cmp-back" aria-label="Back to Discover">
+          <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M19 12H5M11 18l-6-6 6-6"/></svg>
+        </a>
+      </div>
+      <h1 class="page-title cmp-title" data-split data-split-now>Compare destinations</h1>
+      <p class="page-sub">Up to three places side by side. The best value in each row is marked.</p>
+    </div>
+    <a href="#cmp-picker" class="btn btn-ghost-dark cmp-add-btn">
+      <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+      Add destination
+    </a>
   </div>
+</section>
+
+<div class="page cmp-page">
 
   {% if comparison %}
     {% with cols=comparison.scored|length %}
-    <div class="cmp-table" style="--cols: {{ cols }};">
+    <div class="cmp-table" style="--cols: {{ cols }};" data-reveal>
 
       <!-- Column headers -->
       <div class="cmp-col-headers">
         {% for sc in comparison.scored %}
-        <div class="cmp-col-head {% cycle 'ch-a' 'ch-b' 'ch-c' %}">
+        <a class="cmp-col-head {% cycle 'ch-a' 'ch-b' 'ch-c' %}" href="{% url 'destination' sc.city.slug %}">
+          <picture>
+            <source type="image/webp" srcset="{% static 'images/dest/w/' %}{{ sc.city.image_file|cut:'.png' }}.webp" />
+            <img src="{% static 'images/dest/' %}{{ sc.city.image_file }}" alt="" loading="lazy" decoding="async" onerror="this.remove();" />
+          </picture>
           <div class="cmp-col-country">{{ sc.city.country.name }}</div>
-          <div class="cmp-col-city">{{ sc.city.name }} · {{ sc.city.country.get_region_display }}</div>
-        </div>
+          <div class="cmp-col-city">{{ sc.city.name }}, {{ sc.city.country.get_region_display }}</div>
+        </a>
         {% endfor %}
         {% for _ in open_slots %}
-        <a href="#cmp-picker" class="cmp-col-add">+ Add country</a>
+        <a href="#cmp-picker" class="cmp-col-add">
+          <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+          Add country
+        </a>
         {% endfor %}
       </div>
 
@@ -57,7 +78,7 @@
         <div class="cmp-verdict-grid">
           {% for label, winner in comparison.verdicts %}
           <div class="cmp-verdict-item {% if 'Overall' in label %}cmp-verdict-strong{% endif %}">
-            <span class="cmp-verdict-label">{{ label }}:</span>
+            <span class="cmp-verdict-label">{{ label }}</span>
             <span class="cmp-verdict-winner">{{ winner }}</span>
           </div>
           {% endfor %}
@@ -68,21 +89,23 @@
     </div>
     {% endwith %}
   {% else %}
-    <div class="cmp-empty">
-      <div class="cmp-empty-icon">⚖️</div>
+    <div class="cmp-empty" data-reveal>
+      <a class="cmp-empty-slot" href="#cmp-picker"><b>1</b><span>First destination</span></a>
+      <a class="cmp-empty-slot" href="#cmp-picker"><b>2</b><span>Second destination</span></a>
+      <a class="cmp-empty-slot" href="#cmp-picker"><b>3</b><span>Third, if you like</span></a>
       <p>Pick two or three destinations below to see them side by side.</p>
     </div>
   {% endif %}
 
   <!-- Picker -->
-  <form method="get" class="cmp-picker" id="cmp-picker">
+  <form method="get" class="cmp-picker" id="cmp-picker" data-reveal>
     <h3>{% if comparison %}Change selection{% else %}Choose destinations{% endif %}</h3>
     <div class="cmp-picker-row">
       {% for slug in picker_slots %}
       <div class="cmp-picker-field">
-        <label>Destination {{ forloop.counter }}</label>
-        <select name="city">
-          <option value="">— choose —</option>
+        <label for="cmp-city-{{ forloop.counter }}"><i></i>Destination {{ forloop.counter }}</label>
+        <select name="city" id="cmp-city-{{ forloop.counter }}">
+          <option value="">Choose a destination</option>
           {% for c in all_cities %}
             <option value="{{ c.slug }}"
               {% if c.slug == slug %}selected{% endif %}>
@@ -92,7 +115,8 @@
         </select>
       </div>
       {% endfor %}
-      <button type="submit" class="cmp-compare-btn">Compare →</button>
+      <button type="submit" class="btn btn-primary cmp-compare-btn">Compare
+        <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
     </div>
   </form>
 
