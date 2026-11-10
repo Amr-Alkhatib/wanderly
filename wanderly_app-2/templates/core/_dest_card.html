@@ -4,7 +4,7 @@
     <span class="dest-card-img">
       <picture>
         {% with stem=sc.city.image_file|cut:'.png' %}<source type="image/webp" srcset="{% static 'images/dest/w/' %}{{ stem }}-760.webp 760w, {% static 'images/dest/w/' %}{{ stem }}.webp 1400w" sizes="{{ sizes|default:'(max-width: 640px) 82vw, (max-width: 1180px) 46vw, 24vw' }}" />{% endwith %}
-        <img src="{% static 'images/dest/w/' %}{{ sc.city.image_file|cut:'.png' }}.webp\"
+        <img src="{% static 'images/dest/w/' %}{{ sc.city.image_file|cut:'.png' }}.webp"
              alt="{{ name }}" loading="lazy" decoding="async"
              onerror="this.parentNode.classList.add('img-fallback');this.remove();" />
       </picture>
@@ -32,11 +32,11 @@
       {% include "core/_strata.html" with sc=sc dark=True %}
     </span>
   </a>
-  <button class="trip-save-btn"
+  <button type="button" class="trip-save-btn" data-save
           data-destination="{{ sc.city.slug }}"
           data-title="{{ sc.city.name }}"
-          onclick="saveTrip(this)"
-          title="Save to trips">
+          aria-label="Save {{ sc.city.name }}"
+          title="Save to your trips">
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><path d="M17 3H7a2 2 0 0 0-2 2v16l7-3 7 3V5a2 2 0 0 0-2-2z"/></svg>
   </button>
 </article>

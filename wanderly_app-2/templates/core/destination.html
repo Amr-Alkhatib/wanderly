@@ -11,7 +11,7 @@
   <div class="cp-hero-media">
     <picture>
       <source type="image/webp" srcset="{% static 'images/dest/w/' %}{{ city.image_file|cut:'.png' }}.webp" />
-      <img src="{% static 'images/dest/w/' %}{{ city.image_file|cut:'.png' }}.webp\" alt="" data-parallax="16" fetchpriority="high" decoding="async"
+      <img src="{% static 'images/dest/w/' %}{{ city.image_file|cut:'.png' }}.webp" alt="" data-parallax="16" fetchpriority="high" decoding="async"
            onerror="this.closest('.cp-hero-media').classList.add('img-fallback');this.remove();" />
     </picture>
   </div>
@@ -29,14 +29,13 @@
       <h1 class="cp-title" data-split="chars" data-split-now>{{ city.name }}</h1>
       <p class="cp-subtitle"><span class="cp-subtitle-country">{{ city.country.name }}</span> {{ city.summary }}</p>
       <div class="cp-hero-actions" data-reveal>
-        <button id="destSaveBtn"
-                class="trip-save-btn dest-save-btn-inline"
+        <button type="button" id="destSaveBtn"
+                class="trip-save-btn dest-save-btn-inline" data-save
                 data-destination="{{ city.slug }}"
                 data-title="{{ city.name }}"
-                onclick="saveDestTrip(this)"
-                title="Save to trips">
+                title="Save to your trips">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><path d="M17 3H7a2 2 0 0 0-2 2v16l7-3 7 3V5a2 2 0 0 0-2-2z"/></svg>
-          <span id="destSaveBtnLabel">Save</span>
+          <span data-save-label data-on="Saved" data-off="Save">Save</span>
         </button>
         <a class="btn btn-ghost-dark" href="{% url 'compare' %}?city={{ city.slug }}">
           <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 3 4 7l4 4M4 7h16M16 21l4-4-4-4M20 17H4"/></svg>
@@ -242,12 +241,14 @@
       {% endif %}
 
       <div class="cp-cta-stack">
-        <a href="{% url 'search' %}?region={{ city.country.region }}" class="cp-cta-btn" data-magnet>
-          Plan a trip to {{ city.country.name }}
+        {# Opens this city's AI itinerary (the Itinerary tab). Without JavaScript the link reloads the page on that tab. #}
+        <a href="?itinerary=1&amp;days={{ itinerary_days }}#tab-itinerary" class="cp-cta-btn" data-plan-trip data-no-transition data-magnet>
+          Plan a trip to {{ city.name }}
         </a>
-        <a href="#" class="cp-cta-btn cp-cta-outline">
-          Save destination
-        </a>
+        <button type="button" class="cp-cta-btn cp-cta-outline" data-save
+                data-destination="{{ city.slug }}" data-title="{{ city.name }}">
+          <span data-save-label data-on="Saved to your trips" data-off="Save destination">Save destination</span>
+        </button>
       </div>
 
     </aside>
@@ -686,6 +687,31 @@
     if (btn) load(parseInt(btn.dataset.days, 10) || 3);
   });
 
+  // "Plan a trip to <city>": open the Itinerary tab and, unless a plan is already showing or
+  // on its way, start one for the default length.
+  var planned = !!layout.dataset.pending || !layout.querySelector('.cp-placeholder-state');
+  document.querySelectorAll('[data-plan-trip]').forEach(function (a) {
+    a.addEventListener('click', function (e) {
+      e.preventDefault();
+      var tab = document.querySelector('[data-target="tab-itinerary"]');
+      if (tab) tab.click();
+      // bring the plan itself into view, just below the tab bar (which sticks under the nav)
+      var panel = document.getElementById('tab-itinerary'), bar = document.querySelector('.cp-tab-bar-wrapper');
+      if (panel) {
+        // scrolling up brings the nav back, and the stuck tab bar sits under it (see place.css)
+        var root = getComputedStyle(document.documentElement);
+        var navBottom = (parseFloat(root.getPropertyValue('--nav-top')) || 14) + (parseFloat(root.getPropertyValue('--nav-h')) || 68) + 10;
+        var under = navBottom + (bar ? bar.offsetHeight : 0);
+        var y = panel.getBoundingClientRect().top + window.scrollY - under - 12;
+        // a new plan opens the full-screen loading card, which pauses smooth scrolling: jump under it
+        var jump = !planned;
+        if (window.W && W.lenis) W.lenis.scrollTo(y, jump ? { immediate: true, force: true } : { duration: 1.1 });
+        else window.scrollTo(0, y); // native smooth scrolling is cut short by the layout refresh after a tab switch
+      }
+      if (!planned) { planned = true; load({{ itinerary_days }}); }
+    });
+  });
+
   // Arrived via ?itinerary=1 with nothing cached yet: load it without blocking the page.
   if (layout.dataset.pending) load(parseInt(layout.dataset.pending, 10), true);
 })();
@@ -755,72 +781,5 @@
 </script>
 
 
-{% if user.is_authenticated %}
-<script>
-const _DEST_CSRF = document.querySelector('meta[name="csrf-token"]')?.content || '';
-const _DEST_SAVED_MAP = {{ saved_trip_map_json }};
-
-(function initDestBtn() {
-  const btn = document.getElementById('destSaveBtn');
-  const slug = btn && btn.dataset.destination;
-  if (slug && _DEST_SAVED_MAP[slug]) {
-    btn.classList.add('saved');
-    btn.dataset.tripId = _DEST_SAVED_MAP[slug];
-    document.getElementById('destSaveBtnLabel').textContent = 'Saved';
-  }
-})();
-
-async function saveDestTrip(btn) {
-  if (btn.classList.contains('saving')) return;
-  btn.classList.add('saving');
-  const destination = btn.dataset.destination;
-  const title = btn.dataset.title;
-  const label = document.getElementById('destSaveBtnLabel');
-
-  if (btn.classList.contains('saved')) {
-    const tripId = btn.dataset.tripId;
-    if (!tripId) { btn.classList.remove('saving'); return; }
-    try {
-      const res = await fetch(`/api/trips/${tripId}/unsave/`, {
-        method: 'POST',
-        headers: {'X-CSRFToken': _DEST_CSRF},
-      });
-      if (res.ok) {
-        btn.classList.remove('saved');
-        btn.dataset.tripId = '';
-        label.textContent = 'Save';
-        delete _DEST_SAVED_MAP[destination];
-      }
-    } finally {
-      btn.classList.remove('saving');
-    }
-    return;
-  }
-
-  try {
-    const res = await fetch('/api/trips/save/', {
-      method: 'POST',
-      headers: {'Content-Type': 'application/json', 'X-CSRFToken': _DEST_CSRF},
-      body: JSON.stringify({destination, title}),
-    });
-    if (res.ok) {
-      const data = await res.json();
-      btn.classList.add('saved');
-      btn.dataset.tripId = data.id;
-      label.textContent = 'Saved';
-      _DEST_SAVED_MAP[destination] = data.id;
-    }
-  } finally {
-    btn.classList.remove('saving');
-  }
-}
-</script>
-{% else %}
-<script>
-function saveDestTrip() {
-  window.location.href = '/accounts/login/?next=' + encodeURIComponent(window.location.pathname);
-}
-</script>
-{% endif %}
 
 {% endblock %}

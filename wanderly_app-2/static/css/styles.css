@@ -374,6 +374,14 @@ picture{display:contents}
 .trip-save-btn.saved{background:var(--sunset);border-color:var(--sunset);color:#fff}
 .trip-save-btn.saved svg{fill:currentColor}
 .trip-save-btn.saving{pointer-events:none;animation:save-pulse .9s ease-in-out infinite}
+/* the message a save (or a failed one) leaves at the bottom of the screen */
+.toast{position:fixed;left:50%;bottom:max(24px,env(safe-area-inset-bottom));z-index:95;max-width:min(520px,calc(100vw - 32px));
+  padding:14px 20px;border-radius:var(--r-pill);background:var(--atlantic);border:1px solid rgba(255,255,255,.16);color:#fff;font-size:15px;font-weight:550;line-height:1.35;
+  box-shadow:0 24px 50px -20px rgba(11,34,48,.7);opacity:0;pointer-events:none;transform:translate(-50%,16px);
+  transition:opacity .3s,transform .45s var(--ease)}
+.toast.is-on{opacity:1;pointer-events:auto;transform:translate(-50%,0)}
+.toast-link{color:var(--sunset);font-weight:650;text-decoration:underline;text-underline-offset:3px;white-space:nowrap}
+@media (prefers-reduced-motion:reduce){.toast{transition:opacity .2s}}
 @keyframes save-pulse{50%{transform:scale(.9);opacity:.7}}
 
 /* spotlight (React Bits SpotlightCard) */
@@ -586,7 +594,6 @@ html:not(.motion-ok) .hero-pins i{opacity:.8}
 /* ---------- the compass: a score taken apart by the scroll ----------
    The section is tall and its stage is CSS-sticky, so the browser holds it in place
    natively (no JavaScript pinning). compass.js only measures progress. */
-.page-tail{padding:0}
 .inside{position:relative;background:var(--harbour);color:var(--on-dark);isolation:isolate}
 /* plain list until compass.js has built the scene and adds .webgl; then the tall sticky stage */
 .webgl.motion-ok .inside{height:340vh}

@@ -179,6 +179,9 @@ p.cp-practical-row{display:block}
 .cp-cta-btn:hover{background:var(--sunset-deep);color:#fff}
 .cp-cta-outline{background:transparent;color:var(--atlantic);border:1.5px solid var(--line-2);box-shadow:none}
 .cp-cta-outline:hover{background:var(--atlantic);border-color:var(--atlantic);color:#fff}
+.cp-cta-outline.saved{background:var(--lagoon-soft);border-color:var(--lagoon);color:var(--lagoon-deep)}
+.cp-cta-outline.saved:hover{background:var(--lagoon);border-color:var(--lagoon);color:#fff}
+.cp-cta-btn.saving{pointer-events:none;opacity:.65}
 
 /* country: cities list */
 .cp-city-row{display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-top:1px solid var(--line);font-weight:600;color:var(--atlantic);transition:color .2s}

@@ -54,6 +54,7 @@ Still Django templates, no build step and no frontend framework. The motion laye
 - **Dusk over the map** (home hero): soft coral and lagoon light rises in and drifts, the map glides slowly, and six places light up and send out a ring now and then.
 - **The compass** (`compass.js`, three.js): a pocket compass built entirely from code, lit by a small studio baked into the environment. Scrolling takes it apart on camera, and each part is one piece of a score: copper case for budget, enamel bezel for safety, rose dial for climate, blued-steel needle for interests, glass crystal for the explanation. Hold the button to spin the needle; it settles on north and names today's top match.
 - **Strata bars** show every score split into its four factor contributions, wherever a score appears.
+- **Saving** (`saves.js`): every save button on the site (cards, the destination hero and sidebar) goes through one script. Buttons for the same city stay in step, signed-out visitors are sent to log in and brought back, and a short message confirms each save or says when one failed. The saved trips reach the page as a `data-saved-trips` attribute on `<body>`.
 - Visitors who prefer reduced motion get the finished page, phones keep native scrolling, and without WebGL the compass section falls back to a plain list.
 - Destination photos are WebP only, in `static/images/dest/w/`, in two sizes (`srcset`). The PNG originals were removed to save disk space; to add a photo, save `<slug>.webp` (1400 px wide) and `<slug>-760.webp` there.
 
