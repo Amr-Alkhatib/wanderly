@@ -262,9 +262,13 @@
       scale: parseFloat(canvas.dataset.contourScale) || 1,
       // the animated field is capped below full retina density (soft, moving lines don't need it);
       // fields that are drawn once stay crisp
-      dpr: Math.min(window.devicePixelRatio || 1, live ? 1.5 : 2),
-      intro: !reduce && canvas.dataset.contourIntro !== 'off'
+      dpr: Math.min(window.devicePixelRatio || 1, live ? 1.25 : 1.5),
+      // Only the live field animates its own entrance. A static field is drawn ONCE and then
+      // faded in by the compositor (below); redrawing a full-width canvas every frame for the
+      // entrance is what made each page stutter on load and again on reaching the footer.
+      intro: live && !reduce && canvas.dataset.contourIntro !== 'off'
     };
+    var fade = !live && !reduce && canvas.dataset.contourIntro !== 'off' && !!canvas.animate;
     var r = canvas.getBoundingClientRect();
     var api;
     var w = canWorker ? getWorker() : null; // the worker must exist before a canvas is handed over
@@ -289,7 +293,11 @@
       if (Math.abs(b.width - lastW) < 1 && Math.abs(b.height - lastH) < 1) return;
       lastW = b.width; lastH = b.height; api.resize(b.width, b.height);
     }).observe(canvas);
-    if ('IntersectionObserver' in window) new IntersectionObserver(function (es) { api.show(es[0].isIntersecting); }, { rootMargin: '0px 0px -8% 0px' }).observe(canvas);
+    if ('IntersectionObserver' in window) new IntersectionObserver(function (es) {
+      var on = es[0].isIntersecting;
+      api.show(on);
+      if (on && fade) { fade = false; canvas.animate([{ opacity: 0 }, {}], { duration: 1400, easing: 'cubic-bezier(.16,1,.3,1)' }); }
+    }, { rootMargin: '0px 0px -8% 0px' }).observe(canvas);
     else api.show(true);
     if (live) {
       // low-quality mode (see motion.js): the lines stay on screen but stop drifting
@@ -342,6 +350,13 @@
   }
 
   window.WanderlyContours = { mount: mount };
-  function boot() { document.querySelectorAll('canvas[data-contours]').forEach(mount); }
+  // The live hero field joins after the headline has landed, so the first second of every
+  // page is spent on the entrance alone. Static fields are drawn once and cost nothing later.
+  function boot() {
+    document.querySelectorAll('canvas[data-contours]').forEach(function (c) {
+      if (c.dataset.contours === 'live' && !reduce) setTimeout(function () { mount(c); }, 900);
+      else mount(c);
+    });
+  }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot); else boot();
 })();
