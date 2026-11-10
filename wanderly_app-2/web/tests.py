@@ -70,3 +70,67 @@ class ItineraryFlowTests(TestCase):
             resp = self.client.get(self.fragment + "?days=5")
         self.assertEqual(resp.status_code, 503)
         self.assertContains(resp, "itin-retry", status_code=503)
+
+
+class _BodyAttrs(__import__("html.parser").parser.HTMLParser):
+    """Collects the attributes of <body> (the parser undoes Django's HTML escaping, like a browser)."""
+    attrs: dict = {}
+
+    def handle_starttag(self, tag, attrs):
+        if tag == "body":
+            self.attrs = dict(attrs)
+
+
+@override_settings(STORAGES={
+    "default": {"BACKEND": "django.core.files.storage.FileSystemStorage"},
+    "staticfiles": {"BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage"},
+})
+class SaveAndPlanTests(TestCase):
+    """Save buttons and "Plan a trip" on the destination and country pages."""
+
+    def setUp(self):
+        from accounts.models import User
+        now = timezone.now()
+        self.country = Country.objects.create(name="Portugal", region=Region.EUROPE)
+        self.city = City.objects.create(
+            country=self.country, name="Lisbon", primary_category=ActivityCategory.CITY,
+            budget_tier=BudgetTier.BUDGET, is_featured=True,
+        )
+        CostSnapshot.objects.create(city=self.city, daily_budget_eur=40,
+                                    daily_midrange_eur=80, daily_luxury_eur=160, captured_at=now)
+        SafetyAdvisory.objects.create(city=self.city, safety_score=86,
+                                      level=SafetyAdvisory.Level.SAFE, captured_at=now)
+        self.user = User.objects.create(email="t@example.com", supabase_uid="uid-1")
+        self.page = reverse("destination", args=[self.city.slug])
+
+    def test_saved_trips_reach_the_page_as_valid_json(self):
+        # Printed into a <script>, an escaped map ({&quot;lisbon&quot;: ...}) was a syntax error that
+        # broke every save button on the page as soon as one trip was saved.
+        self.client.force_login(self.user)
+        saved = {"lisbon": "trip-1", "tokyo": "trip-2"}
+        with mock.patch("web.views_saved.get_saved_trip_map", return_value=saved):
+            resp = self.client.get(self.page)
+        parser = _BodyAttrs()
+        parser.feed(resp.content.decode())
+        import json
+        self.assertEqual(json.loads(parser.attrs["data-saved-trips"]), saved)
+        self.assertIn("data-signed-in", parser.attrs)
+        self.assertNotContains(resp, "_SAVED_MAP")
+
+    def test_destination_save_buttons_are_real_buttons(self):
+        resp = self.client.get(self.page)
+        import re
+        buttons = re.findall(r'<button[^>]*\sdata-save[\s>][^>]*data-destination="lisbon"', resp.content.decode())
+        self.assertEqual(len(buttons), 2)  # the hero button and the sidebar one
+        self.assertNotContains(resp, 'href="#" class="cp-cta-btn')
+        self.assertContains(resp, "js/wanderly/saves.js")
+
+    def test_plan_a_trip_opens_this_citys_itinerary(self):
+        resp = self.client.get(self.page)
+        self.assertContains(resp, "Plan a trip to Lisbon")
+        self.assertContains(resp, 'href="?itinerary=1&amp;days=3#tab-itinerary" class="cp-cta-btn" data-plan-trip')
+
+    def test_country_plan_a_trip_opens_its_lead_citys_itinerary(self):
+        resp = self.client.get(reverse("country_profile", args=[self.country.slug]))
+        self.assertContains(resp, f'href="{self.page}?itinerary=1&amp;days=3#tab-itinerary"')
+        self.assertContains(resp, "Plan a trip to Lisbon")

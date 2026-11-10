@@ -40,7 +40,7 @@
         {% if trip.city %}
           <picture>
             {% with stem=trip.city.image_file|cut:'.png' %}<source type="image/webp" srcset="{% static 'images/dest/w/' %}{{ stem }}-760.webp 760w, {% static 'images/dest/w/' %}{{ stem }}.webp 1400w" sizes="(max-width: 640px) 100vw, (max-width: 1180px) 48vw, 31vw" />{% endwith %}
-            <img src="{% static 'images/dest/w/' %}{{ trip.city.image_file|cut:'.png' }}.webp\"
+            <img src="{% static 'images/dest/w/' %}{{ trip.city.image_file|cut:'.png' }}.webp"
                  alt="{{ trip.city.name }}" loading="lazy" decoding="async"
                  onerror="this.parentNode.classList.add('img-fallback');this.remove();" />
           </picture>
@@ -117,14 +117,11 @@
 </div>
 
 <script>
-const CSRF = document.querySelector('meta[name="csrf-token"]')?.content || '';
-
-async function markComplete(tripId, btn) {
-  const res = await fetch(`/api/trips/${tripId}/complete/`, {
-    method: 'POST',
-    headers: {'X-CSRFToken': CSRF},
-  });
-  if (res.ok) {
+// Both buttons use the shared trip helpers in saves.js, which also say when something went wrong.
+function markComplete(tripId, btn) {
+  if (btn.disabled) return;
+  btn.disabled = true;
+  W.tripPost(`/api/trips/${encodeURIComponent(tripId)}/complete/`).then(() => {
     const card = btn.closest('.saved-card');
     const badge = card.querySelector('.saved-status-badge');
     if (badge) {
@@ -133,21 +130,19 @@ async function markComplete(tripId, btn) {
     }
     card.dataset.status = 'completed';
     btn.remove();
-  }
+  }, (err) => { btn.disabled = false; W.tripError(err, 'mark this trip as visited'); });
 }
 
-async function removeTrip(tripId, btn) {
-  const res = await fetch(`/api/trips/${tripId}/unsave/`, {
-    method: 'POST',
-    headers: {'X-CSRFToken': CSRF},
-  });
-  if (res.ok) {
+function removeTrip(tripId, btn) {
+  if (btn.disabled) return;
+  btn.disabled = true;
+  W.tripPost(`/api/trips/${encodeURIComponent(tripId)}/unsave/`).then(() => {
     const card = btn.closest('.saved-card');
     card.style.transition = 'opacity .25s, transform .25s';
     card.style.opacity = '0';
     card.style.transform = 'scale(0.95)';
     setTimeout(() => card.remove(), 280);
-  }
+  }, (err) => { btn.disabled = false; W.tripError(err, 'remove this trip'); });
 }
 
 // Tab filtering

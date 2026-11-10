@@ -38,8 +38,9 @@
   <script defer src="{% static 'js/wanderly/bits.js' %}"></script>
   <script defer src="{% static 'js/wanderly/motion.js' %}"></script>
   <script defer src="{% static 'js/wanderly/enhance.js' %}"></script>
+  <script defer src="{% static 'js/wanderly/saves.js' %}"></script>
 </head>
-<body class="{% block body_class %}{% endblock %}">
+<body class="{% block body_class %}{% endblock %}"{% if user.is_authenticated %} data-signed-in{% endif %}{% if saved_trip_map_json %} data-saved-trips="{{ saved_trip_map_json }}"{% endif %}>
 {% csrf_token %}
 <a class="skip-link" href="#main">Skip to content</a>
 

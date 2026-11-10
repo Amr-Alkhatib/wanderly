@@ -12,7 +12,7 @@
   <div class="cp-hero-media">
     <picture>
       <source type="image/webp" srcset="{% static 'images/dest/w/' %}{{ anchor.image_file|cut:'.png' }}.webp" />
-      <img src="{% static 'images/dest/w/' %}{{ anchor.image_file|cut:'.png' }}.webp\" alt="" data-parallax="16" fetchpriority="high" decoding="async"
+      <img src="{% static 'images/dest/w/' %}{{ anchor.image_file|cut:'.png' }}.webp" alt="" data-parallax="16" fetchpriority="high" decoding="async"
            onerror="this.closest('.cp-hero-media').classList.add('img-fallback');this.remove();" />
     </picture>
   </div>
@@ -191,9 +191,16 @@
     </div>
 
     <div class="cp-cta-stack">
-      <a href="{% url 'search' %}?region={{ country.region }}" class="cp-cta-btn" data-magnet>
+      {% if anchor %}
+      {# This page is built around its lead city, so planning starts with that city's itinerary. #}
+      <a href="{% url 'destination' anchor.slug %}?itinerary=1&amp;days=3#tab-itinerary" class="cp-cta-btn" data-magnet>
+        Plan a trip to {{ anchor.name }}
+      </a>
+      {% else %}
+      <a href="{% url 'search' %}?q={{ country.name|urlencode }}" class="cp-cta-btn" data-magnet>
         Plan a trip to {{ country.name }}
       </a>
+      {% endif %}
       <a href="{% url 'compare' %}" class="cp-cta-btn cp-cta-outline">
         Compare destinations
       </a>
