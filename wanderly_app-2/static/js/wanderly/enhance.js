@@ -47,8 +47,8 @@
     $$('.cp-month-bar', scope).forEach(function (b, i) {
       gsap.fromTo(b, { scaleY: 0 }, { scaleY: 1, duration: 1, delay: 0.15 + i * 0.035, ease: 'expo.out', overwrite: true });
     });
-    $$('.strata', scope).forEach(function (s, i) {
-      if (some(s.children)) gsap.fromTo(s.children, { scaleX: 0 }, { scaleX: 1, duration: 1.1, stagger: 0.08, delay: 0.1 + i * 0.05, overwrite: true });
+    $$('.strata', scope).forEach(function (s) {
+      s.classList.remove('is-in'); void s.offsetWidth; s.classList.add('is-in'); // restart the CSS build-up
     });
     $$('.factor-meter i', scope).forEach(function (b, i) {
       gsap.fromTo(b, { scaleX: 0 }, { scaleX: 1, duration: 1.2, delay: 0.15 + i * 0.07, overwrite: true });

@@ -114,6 +114,7 @@ html.lenis,html.lenis body{height:auto}
 /* pre-hide what motion.js will reveal (only when motion is allowed and JS runs) */
 .motion-ok [data-reveal],
 .motion-ok [data-hero]{opacity:0}
+.motion-ok [data-reveal].is-in{opacity:1} /* the entrance itself is a Web Animation (motion.js) */
 .motion-ok [data-split]{visibility:hidden}
 .motion-ok [data-split].is-split{visibility:visible}
 /* SplitText line masks: give ascenders and descenders room so the clip never bites */
@@ -183,7 +184,8 @@ select:focus,.field:focus{border-color:var(--sunset);box-shadow:0 0 0 4px rgba(2
   display:flex;align-items:center;gap:clamp(12px,2vw,28px);
   padding:0 12px 0 18px;border-radius:var(--r-l);
   background:rgba(11,34,48,.62);
-  -webkit-backdrop-filter:blur(18px) saturate(1.4);backdrop-filter:blur(18px) saturate(1.4);
+  /* the one piece of real glass on the page: a single blurred layer is cheap, hundreds are not */
+  -webkit-backdrop-filter:blur(14px) saturate(1.4);backdrop-filter:blur(14px) saturate(1.4);
   border:1px solid var(--line-dark);
   box-shadow:0 20px 50px -30px rgba(3,12,18,.8);
   color:var(--on-dark);transition:background-color .4s;
@@ -294,6 +296,12 @@ html.pt-arrive .pt-pin{opacity:1;transform:none;animation:pt-pin-out .35s ease f
 .strata{display:flex;gap:2px;height:6px;width:100%;border-radius:var(--r-pill);background:var(--line);overflow:hidden}
 .strata-seg{display:block;height:100%;flex:0 0 calc(var(--p) * 1%);transform-origin:0 50%}
 .strata-seg:first-child{border-radius:var(--r-pill) 0 0 var(--r-pill)}
+/* the build-up is a CSS transition (compositor), switched on by one class from motion.js */
+.motion-ok .strata-seg{transform:scaleX(0);transition:transform 1.1s var(--ease)}
+.motion-ok .strata-seg:nth-child(2){transition-delay:.08s}
+.motion-ok .strata-seg:nth-child(3){transition-delay:.16s}
+.motion-ok .strata-seg:nth-child(4){transition-delay:.24s}
+.motion-ok .strata.is-in .strata-seg{transform:none}
 .f-budget{background:var(--f-budget)}
 .f-safety{background:var(--f-safety)}
 .f-climate{background:var(--f-climate)}
@@ -308,8 +316,8 @@ html.pt-arrive .pt-pin{opacity:1;transform:none;animation:pt-pin-out .35s ease f
 .legend .k-interests{background:var(--f-interests)}
 
 /* score ring */
-.ring{position:relative;display:inline-grid;place-items:center;width:52px;height:52px;flex:none;border-radius:50%;background:rgba(11,34,48,.42);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px)}
-.ring.on-light{background:none;-webkit-backdrop-filter:none;backdrop-filter:none}
+.ring{position:relative;display:inline-grid;place-items:center;width:52px;height:52px;flex:none;border-radius:50%;background:rgba(11,34,48,.6)}
+.ring.on-light{background:none}
 .ring svg{position:absolute;inset:0;width:100%;height:100%;transform:rotate(-90deg)}
 .ring circle{fill:none;stroke-width:3.2}
 .ring .ring-track{stroke:rgba(255,255,255,.2)}
@@ -328,11 +336,10 @@ html.pt-arrive .pt-pin{opacity:1;transform:none;animation:pt-pin-out .35s ease f
 .score-badge small{font-weight:500;opacity:.7;font-size:11.5px}
 
 /* destination card (featured + search) */
-.dest-card-wrap{position:relative;border-radius:var(--r-l);transform-style:preserve-3d;will-change:transform}
+.dest-card-wrap{position:relative;border-radius:var(--r-l);box-shadow:0 30px 60px -38px rgba(11,34,48,.6)}
 .dest-card{
   position:relative;display:flex;flex-direction:column;justify-content:flex-end;height:100%;min-height:380px;
   border-radius:var(--r-l);overflow:hidden;isolation:isolate;color:#fff;background:var(--atlantic);
-  box-shadow:0 30px 60px -38px rgba(11,34,48,.6);
 }
 .dest-card-img{position:absolute;inset:0;z-index:-2;background:linear-gradient(150deg,var(--atlantic-2),var(--harbour))}
 .dest-card-img img{width:100%;height:100%;object-fit:cover;transform:scale(1.02);transition:transform 1.1s var(--ease),filter .6s}
@@ -351,19 +358,18 @@ picture{display:contents}
 .dest-card-meta span{position:relative}
 .dest-card-meta span+span::before{content:"";position:absolute;left:-8px;top:50%;width:3px;height:3px;margin-top:-1.5px;border-radius:50%;background:currentColor;opacity:.6}
 .dest-card-tags{display:flex;flex-wrap:wrap;gap:6px}
-.dest-card-tags .pill{background:rgba(255,255,255,.14);color:#fff;-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px)}
+.dest-card-tags .pill{background:rgba(255,255,255,.2);color:#fff}
 .dest-card .strata{background:rgba(255,255,255,.16);margin-top:4px}
 .dest-card .score-badge{display:none}
 
 .trip-save-btn{
   position:absolute;top:14px;right:14px;z-index:3;width:44px;height:44px;border-radius:50%;
   display:grid;place-items:center;color:#fff;
-  background:rgba(11,34,48,.32);border:1px solid rgba(255,255,255,.28);
-  -webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);
+  background:rgba(11,34,48,.52);border:1px solid rgba(255,255,255,.3);
   transition:background-color .25s,border-color .25s,transform .35s var(--ease),color .25s;
 }
 .trip-save-btn svg{width:17px;height:17px;transition:fill .25s}
-.trip-save-btn:hover{background:rgba(11,34,48,.55);transform:scale(1.06)}
+.trip-save-btn:hover{background:rgba(11,34,48,.75);transform:scale(1.06)}
 .trip-save-btn.saved{background:var(--sunset);border-color:var(--sunset);color:#fff}
 .trip-save-btn.saved svg{fill:currentColor}
 .trip-save-btn.saving{pointer-events:none;animation:save-pulse .9s ease-in-out infinite}
@@ -381,10 +387,11 @@ picture{display:contents}
 /* click spark layer */
 .spark-layer{position:fixed;inset:0;pointer-events:none;z-index:600;overflow:visible}
 
-/* grain */
+/* grain: a small pre-rendered tile. (An SVG turbulence filter with mix-blend-mode looked the
+   same but made the browser re-blend the whole hero on every frame.) */
 .grain::after{
-  content:"";position:absolute;inset:0;pointer-events:none;z-index:0;opacity:.09;mix-blend-mode:overlay;
-  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  content:"";position:absolute;inset:0;pointer-events:none;z-index:0;opacity:.5;
+  background:url(../images/grain.png) 0 0/104px 104px;
 }
 
 /* dark page head used by search / compare / saved */
@@ -437,9 +444,8 @@ picture{display:contents}
 /* the ranking card: the product's idea, shown live */
 .rank-card{
   position:relative;border-radius:var(--r-xl);padding:clamp(22px,2.4vw,30px);
-  background:linear-gradient(160deg,rgba(26,60,78,.78),rgba(11,34,48,.86));
+  background:linear-gradient(160deg,rgba(26,60,78,.9),rgba(11,34,48,.94));
   border:1px solid var(--line-dark);box-shadow:var(--shadow-2);
-  -webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);
   --spot:rgba(46,156,148,.18);
 }
 .rank-card-head{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;margin-bottom:18px}
@@ -537,10 +543,10 @@ picture{display:contents}
    natively (no JavaScript pinning). compass.js only measures progress. */
 .page-tail{padding:0}
 .inside{position:relative;background:var(--harbour);color:var(--on-dark);isolation:isolate}
-.motion-ok .inside{height:340vh}
-.no-webgl .inside{height:auto}
+/* plain list until compass.js has built the scene and adds .webgl; then the tall sticky stage */
+.webgl.motion-ok .inside{height:340vh}
 .inside-stage{position:sticky;top:0;height:100vh;height:100svh;overflow:hidden;isolation:isolate;display:flex;align-items:center;padding-top:calc(var(--nav-h) + var(--nav-top))}
-.no-webgl .inside-stage,html:not(.motion-ok) .inside-stage{position:relative;height:auto;padding:clamp(96px,10vw,140px) 0}
+html:not(.webgl) .inside-stage,html:not(.motion-ok) .inside-stage{position:relative;height:auto;padding:clamp(96px,10vw,140px) 0}
 .inside-contours{position:absolute;inset:0;width:100%;height:100%;z-index:-1;opacity:.75}
 .inside-stage::before{content:"";position:absolute;inset:0;z-index:-1;background:radial-gradient(640px 520px at 52% 55%,rgba(46,156,148,.18),transparent 65%),radial-gradient(520px 400px at 50% 90%,rgba(244,132,95,.12),transparent 70%)}
 .inside-grid{position:relative;z-index:1;display:grid;grid-template-columns:minmax(260px,.82fr) minmax(0,1.25fr) minmax(250px,.78fr);gap:clamp(20px,3vw,48px);align-items:center}
@@ -576,17 +582,17 @@ picture{display:contents}
 .inside-meter em{position:absolute;inset:0;background:var(--sunset);transform:scaleX(0);transform-origin:0 50%}
 .inside-slot{position:relative;height:min(76vh,760px);min-height:380px}
 .compass-canvas{position:absolute;inset:-6% -10%;width:120%;height:112%;display:block}
-.no-webgl .compass-canvas{display:none}
-.no-webgl .inside-slot{display:none}
-.no-webgl .inside-grid{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
-.no-webgl .inside-hold,.no-webgl .inside-meter{display:none}
-.no-webgl .hold-result[hidden]{display:block}
-.no-webgl .only-3d,html:not(.motion-ok) .only-3d{display:none}
+html:not(.webgl) .compass-canvas{display:none}
+html:not(.webgl) .inside-slot{display:none}
+html:not(.webgl) .inside-grid{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
+html:not(.webgl) .inside-hold,html:not(.webgl) .inside-meter{display:none}
+html:not(.webgl) .hold-result[hidden]{display:block}
+html:not(.webgl) .only-3d,html:not(.motion-ok) .only-3d{display:none}
 .inside-callouts{display:flex;flex-direction:column}
 .callout{position:relative;display:grid;grid-template-columns:auto minmax(0,1fr);column-gap:12px;padding:14px 0;border-top:1px solid var(--line-dark);opacity:.2;transform:translateX(18px);transition:opacity .55s ease,transform .7s var(--ease)}
 .callout:last-child{border-bottom:1px solid var(--line-dark)}
 .callout.on{opacity:1;transform:none}
-.no-webgl .callout,html:not(.motion-ok) .callout{opacity:1;transform:none}
+html:not(.webgl) .callout,html:not(.motion-ok) .callout{opacity:1;transform:none}
 .callout-swatch{grid-row:1/4;width:10px;height:38px;border-radius:4px;margin-top:4px}
 .callout-swatch.k-why{background:linear-gradient(160deg,rgba(255,255,255,.9),rgba(170,210,220,.45));box-shadow:inset 0 0 0 1px rgba(255,255,255,.5)}
 .callout-part{font-size:12.5px;color:var(--on-dark-3)}
@@ -605,7 +611,7 @@ picture{display:contents}
   .inside-slot{height:min(56vh,560px)}
 }
 @media (max-width:899px){
-  .motion-ok .inside{height:300vh}
+  .webgl.motion-ok .inside{height:300vh}
   .inside-stage{align-items:stretch;padding-bottom:16px}
   .inside-grid{grid-template-columns:1fr;grid-template-rows:auto minmax(0,1fr) auto;gap:8px;height:100%;align-content:stretch;align-items:stretch}
   .inside-copy h2{font-size:clamp(1.9rem,8vw,2.6rem)}
@@ -615,10 +621,10 @@ picture{display:contents}
   .inside-slot{height:auto;min-height:0}
   .compass-canvas{inset:0;width:100%;height:100%}
   .inside-callouts{display:block;min-height:112px}
-  .motion-ok .inside-callouts .callout{display:none}
-  .motion-ok .inside-callouts .callout.current{display:block;opacity:1;transform:none;animation:found-in .5s var(--ease) both}
-  html:not(.motion-ok) .inside-callouts .callout,.no-webgl .inside-callouts .callout{margin-bottom:16px}
-  .no-webgl .inside-grid{grid-template-columns:1fr}
+  .webgl.motion-ok .inside-callouts .callout{display:none}
+  .webgl.motion-ok .inside-callouts .callout.current{display:block;opacity:1;transform:none;animation:found-in .5s var(--ease) both}
+  html:not(.motion-ok) .inside-callouts .callout,html:not(.webgl) .inside-callouts .callout{margin-bottom:16px}
+  html:not(.webgl) .inside-grid{grid-template-columns:1fr}
 }
 @media (prefers-reduced-motion:reduce){
   .inside-hold{display:none}
@@ -645,6 +651,8 @@ picture{display:contents}
 .results-meta b{color:var(--atlantic);font-weight:700}
 .search-grid,.card-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,270px),1fr));gap:clamp(12px,1.4vw,20px)}
 .search-grid .dest-card{min-height:360px}
+/* a long results page only lays out and paints the cards near the screen */
+.search-grid .dest-card-wrap{content-visibility:auto;contain-intrinsic-height:auto 360px}
 .search-empty{grid-column:1/-1;padding:56px 24px;text-align:center;border:1.5px dashed var(--line-2);border-radius:var(--r-l);color:var(--ink-3)}
 .search-empty h2{font-size:28px;font-stretch:84%;letter-spacing:-.02em;color:var(--atlantic);margin-bottom:8px}
 .search-empty .btn{margin-top:20px}
@@ -744,7 +752,7 @@ picture{display:contents}
 .saved-card:hover .saved-card-img img{transform:scale(1.06)}
 .saved-card-img .img-fallback-glyph{font-size:52px}
 .saved-card-img .saved-no-img{display:grid;place-items:center;position:absolute;inset:0}
-.saved-status-badge{position:absolute;left:14px;top:14px;height:30px;padding:0 13px;border-radius:var(--r-pill);display:inline-flex;align-items:center;gap:7px;font-size:13px;font-weight:650;color:#fff;background:rgba(11,34,48,.45);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px)}
+.saved-status-badge{position:absolute;left:14px;top:14px;height:30px;padding:0 13px;border-radius:var(--r-pill);display:inline-flex;align-items:center;gap:7px;font-size:13px;font-weight:650;color:#fff;background:rgba(11,34,48,.66)}
 .saved-status-badge::before{content:"";width:7px;height:7px;border-radius:50%;background:var(--sunset)}
 .saved-status-completed::before{background:#7DE0D6}
 .saved-bookmark-btn{position:absolute;right:14px;top:14px;width:44px;height:44px;border-radius:50%;display:grid;place-items:center;color:#fff;background:var(--sunset);transition:transform .35s var(--ease),background-color .25s}
@@ -813,6 +821,7 @@ picture{display:contents}
   .featured-grid .dest-card{min-height:420px}
   .search-grid{grid-template-columns:1fr 1fr;gap:10px}
   .search-grid .dest-card{min-height:250px;border-radius:var(--r-m)}
+  .search-grid .dest-card-wrap{contain-intrinsic-height:auto 250px;border-radius:var(--r-m)}
   .search-grid .dest-card-body{padding:14px;gap:7px}
   .search-grid .dest-card-name{font-size:20px}
   .search-grid .dest-card-meta{font-size:12.5px;gap:2px 12px}

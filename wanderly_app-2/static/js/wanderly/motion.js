@@ -133,11 +133,11 @@
       tl.from(card, { y: 50, opacity: 0, rotate: 1.5, duration: 1.3 })
         .from(rows, { x: 30, opacity: 0, stagger: 0.08, duration: 0.9 }, 0.25);
       rows.forEach(function (row, i) {
-        tl.fromTo(row.querySelectorAll('.strata-seg'), { scaleX: 0 }, { scaleX: 1, stagger: 0.09, duration: 1, ease: 'expo.out' }, 0.45 + i * 0.08);
+        var bar = row.querySelector('.strata');
+        if (bar) { bar.setAttribute('data-done', ''); tl.call(function () { bar.classList.add('is-in'); }, null, 0.45 + i * 0.08); }
         var n = row.querySelector('[data-count]');
         if (n) { tl.add(W.countUp(n, { scroll: false, duration: 1.4 }) || function () {}, 0.45 + i * 0.08); n.removeAttribute('data-count'); }
       });
-      $$('.strata', card).forEach(function (s) { s.setAttribute('data-done', ''); });
     }
     var orbit = hero.querySelector('.orbit');
     if (orbit) {
@@ -155,39 +155,43 @@
     });
   });
 
-  /* ---------- blocks rise in, in batches ---------- */
+  /* ---------- blocks rise in, in batches ----------
+     One IntersectionObserver instead of a scroll listener per element, and the animation
+     itself runs on the compositor (Web Animations), so it stays smooth even while the main
+     thread is busy decoding photos. A page of 100 cards costs the same as a page of 10. */
   safe(function () {
     var els = $$('[data-reveal]');
     if (!els.length) return;
-    if (W.reduce || !window.ScrollTrigger) { gsap.set(els, { opacity: 1 }); return; }
-    gsap.set(els, { y: 34 });
-    ScrollTrigger.batch(els, {
-      start: 'top 92%', once: true,
-      onEnter: function (batch) {
-        gsap.to(batch, {
-          opacity: 1, y: 0, duration: 1.1, stagger: 0.08, overwrite: true,
-          // hand transforms back to CSS hovers, except where the tilt effect owns them
-          onComplete: function () { batch.forEach(function (el) { if (!el.hasAttribute('data-tilt')) gsap.set(el, { clearProps: 'transform' }); }); }
-        });
-      }
-    });
+    if (W.reduce || !('IntersectionObserver' in window) || !Element.prototype.animate) {
+      els.forEach(function (el) { el.classList.add('is-in'); });
+      return;
+    }
+    var io = new IntersectionObserver(function (entries) {
+      var n = 0;
+      entries.forEach(function (en) {
+        if (!en.isIntersecting) return;
+        var el = en.target;
+        io.unobserve(el);
+        el.classList.add('is-in');
+        el.animate(
+          [{ opacity: 0, transform: 'translateY(34px)' }, { opacity: 1, transform: 'translateY(0)' }],
+          { duration: 1100, delay: Math.min(n++, 8) * 80, easing: 'cubic-bezier(.16,1,.3,1)', fill: 'backwards' }
+        );
+      });
+    }, { rootMargin: '0px 0px -7% 0px' });
+    els.forEach(function (el) { io.observe(el); });
   });
 
-  /* ---------- strata bars build up segment by segment ---------- */
+  /* ---------- strata bars build up segment by segment ----------
+     A CSS transition per segment (see .strata.is-in); JavaScript only flips one class. */
   safe(function () {
     var bars = $$('.strata').filter(function (s) { return !s.hasAttribute('data-done'); });
-    if (!bars.length || W.reduce || !window.ScrollTrigger) return;
-    bars = bars.filter(function (s) { return s.children.length; });
     if (!bars.length) return;
-    bars.forEach(function (s) { gsap.set(s.children, { scaleX: 0 }); });
-    ScrollTrigger.batch(bars, {
-      start: 'top 94%', once: true,
-      onEnter: function (batch) {
-        batch.forEach(function (s, i) {
-          gsap.to(s.children, { scaleX: 1, duration: 1.1, stagger: 0.08, delay: i * 0.05, ease: 'expo.out' });
-        });
-      }
-    });
+    if (W.reduce || !('IntersectionObserver' in window)) { bars.forEach(function (s) { s.classList.add('is-in'); }); return; }
+    var io = new IntersectionObserver(function (entries) {
+      entries.forEach(function (en) { if (en.isIntersecting) { io.unobserve(en.target); en.target.classList.add('is-in'); } });
+    }, { rootMargin: '0px 0px -5% 0px' });
+    bars.forEach(function (s) { io.observe(s); });
   });
 
   /* ---------- numbers count up ---------- */

@@ -9,7 +9,7 @@
      gold rose dial  -> climate
      copper case     -> budget
    The verb: hold to find north. The needle spins up, ticks, and settles. */
-import * as THREE from '../../vendor/three/three.module.min.js';
+let THREE = null; // three.js is fetched and parsed only when the scene is about to be built
 
 const html = document.documentElement;
 const section = document.querySelector('[data-inside]');
@@ -31,23 +31,43 @@ const SHOTS = {
   rebuild: { polar: 16, az: 6, fit: 0.88, ty: 5, explode: 0, env: -0.4 },
 };
 
-if (section) {
-  try { boot(); } catch (err) { fail(err); }
-}
 
 function fail(err) {
+  html.classList.remove('webgl');
   html.classList.add('no-webgl');
   if (err && window.console) console.warn('[wanderly] compass disabled:', err);
 }
 
-function boot() {
+function hasRealGPU() {
+  try {
+    const c = document.createElement('canvas');
+    const gl = c.getContext('webgl2', { failIfMajorPerformanceCaveat: true }) || c.getContext('webgl', { failIfMajorPerformanceCaveat: true });
+    if (!gl) return false;
+    const info = gl.getExtension('WEBGL_debug_renderer_info');
+    const name = info ? String(gl.getParameter(info.UNMASKED_RENDERER_WEBGL)) : '';
+    const lose = gl.getExtension('WEBGL_lose_context'); if (lose) lose.loseContext();
+    return !/swiftshader|llvmpipe|softpipe|software|basic render/i.test(name);
+  } catch (e) { return false; }
+}
+
+// let the browser breathe between setup steps, so building the scene never shows up as one long stall
+const idle = () => new Promise((r) => (window.requestIdleCallback ? requestIdleCallback(() => r(), { timeout: 250 }) : setTimeout(r, 16)));
+
+/* Until this finishes, the section is a plain list (the no-WebGL fallback). It is only
+   upgraded to the tall, scroll-driven stage once the scene is built and its shaders are
+   compiled, so the visitor never scrolls into a half-ready canvas. */
+async function boot() {
   const canvas = section.querySelector('.compass-canvas');
   if (!canvas) return;
-  let renderer;
-  try {
-    renderer = new THREE.WebGLRenderer({ canvas, antialias: !lite, alpha: true, powerPreference: 'high-performance' });
-  } catch (e) { fail(e); return; }
-  if (!renderer.getContext()) { fail(); return; }
+  // No real GPU (software rendering)? Then stay on the plain list: a 3D scene drawn by the CPU
+  // is the one thing that would make the whole page crawl. Checked on a throwaway context,
+  // before three.js is even downloaded. `?force3d` skips the check for testing.
+  const force = /[?&]force3d\b/.test(location.search);
+  if (!force && !hasRealGPU()) { fail(); return; }
+  THREE = await import('../../vendor/three/three.module.min.js');
+  await idle();
+  const renderer = new THREE.WebGLRenderer({ canvas, antialias: !lite, alpha: true, failIfMajorPerformanceCaveat: !force });
+  if (!renderer.getContext()) throw new Error('no WebGL context');
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
   renderer.toneMappingExposure = 1.08;
   renderer.outputColorSpace = THREE.SRGBColorSpace;
@@ -59,23 +79,44 @@ function boot() {
   scene.environment = pmrem.fromScene(studio, 0.035).texture;
   studio.traverse((o) => { o.geometry && o.geometry.dispose(); o.material && o.material.dispose(); });
   pmrem.dispose();
+  await idle();
 
   const compass = buildCompass();
   scene.add(compass.root);
+  await idle();
 
   const camera = new THREE.PerspectiveCamera(24, 1, 1, 2000);
   const target = new THREE.Vector3();
-  let Wd = 1, Hd = 1, dpr = Math.min(window.devicePixelRatio || 1, lite ? 1.5 : 1.75);
+  // metal reads sharp well below retina density; capping it is the biggest single GPU saving
+  const DPR_MAX = Math.min(window.devicePixelRatio || 1, lite ? 1.25 : 1.5);
+  let Wd = 1, Hd = 1, dpr = DPR_MAX;
   const cur = { ...SHOTS.enter };
   const pointer = { x: 0, y: 0, sx: 0, sy: 0 };
   let time = 0, visible = true, progress = 0;
 
-  function resize() {
-    const r = canvas.getBoundingClientRect();
-    Wd = Math.max(1, Math.round(r.width)); Hd = Math.max(1, Math.round(r.height));
+  // shaders compile in the background (KHR_parallel_shader_compile) instead of on first draw
+  if (renderer.compileAsync && renderer.extensions.has('KHR_parallel_shader_compile')) {
+    try { await renderer.compileAsync(scene, camera); } catch (e) { /* falls back to compiling on first draw */ }
+  } else { await idle(); renderer.compile(scene, camera); await idle(); }
+  // the visitor has already scrolled past: growing the section now would shove the page under them
+  if (section.getBoundingClientRect().bottom < 0) { renderer.dispose(); return; }
+
+  /* --- layout is measured on resize only; frames never read it --- */
+  const items = Array.from(section.querySelectorAll('.callout'));
+  const svg = section.querySelector('.leaders');
+  const stage = section.querySelector('.inside-stage');
+  const geo = { cl: 0, ct: 0, items: [] };
+  const offsetWithin = (el, root) => { let x = 0, y = 0; while (el && el !== root) { x += el.offsetLeft; y += el.offsetTop; el = el.offsetParent; } return [x, y]; };
+  let mobile = isMobile(), dirty = true;
+  function measure() {
+    mobile = isMobile();
+    Wd = Math.max(1, canvas.offsetWidth); Hd = Math.max(1, canvas.offsetHeight);
     renderer.setPixelRatio(dpr);
     renderer.setSize(Wd, Hd, false);
     camera.aspect = Wd / Hd;
+    const c = offsetWithin(canvas, stage); geo.cl = c[0]; geo.ct = c[1];
+    geo.items = items.map((li) => offsetWithin(li, stage));
+    last.fill(NaN); dirty = true;
   }
 
   function place(p) {
@@ -90,9 +131,8 @@ function boot() {
 
   /* --- scroll: the section is tall and its stage is CSS-sticky; this only measures --- */
   const ST = window.ScrollTrigger;
-  let st = null;
   if (ST && !reduce) {
-    st = ST.create({ trigger: section, start: 'top top', end: 'bottom bottom', invalidateOnRefresh: true,
+    ST.create({ trigger: section, start: 'top top', end: 'bottom bottom', invalidateOnRefresh: true,
       onUpdate: (self) => { progress = self.progress; } });
   }
   function goal() {
@@ -137,7 +177,7 @@ function boot() {
     holdBtn.addEventListener('keyup', (e) => { if (e.key === ' ' || e.key === 'Enter') endHold(); });
     holdBtn.addEventListener('contextmenu', (e) => e.preventDefault());
   }
-  let lastSector = 0;
+  let lastSector = 0, ringShown = '';
   function stepNeedle(dt) {
     const TAU = Math.PI * 2;
     if (needle.holding) {
@@ -152,7 +192,8 @@ function boot() {
       needle.power = Math.max(0, needle.power - dt * 0.6);
     }
     needle.h += needle.v * dt;
-    if (holdBtn) holdBtn.style.setProperty('--p', needle.holding ? needle.power.toFixed(3) : (needle.power * 0.6).toFixed(3));
+    const ring = (needle.holding ? needle.power : needle.power * 0.6).toFixed(2);
+    if (holdBtn && ring !== ringShown) { holdBtn.style.setProperty('--p', ring); ringShown = ring; }
     const sector = Math.floor(needle.h / (Math.PI / 6));
     if (sector !== lastSector && Math.abs(needle.v) > 0.8) { if (soundOn) sound.tick(Math.abs(needle.v)); lastSector = sector; }
     // settled after a real hold: reveal where north points today
@@ -172,10 +213,7 @@ function boot() {
     compass.needle.rotation.y = -needle.h;
   }
 
-  /* --- callouts and leader lines --- */
-  const items = Array.from(section.querySelectorAll('.callout'));
-  const svg = section.querySelector('.leaders');
-  const stage = section.querySelector('.inside-stage');
+  /* --- callouts and leader lines: the DOM is only touched when something actually changed --- */
   const paths = [], dots = [];
   if (svg) items.forEach(() => {
     const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
@@ -186,47 +224,61 @@ function boot() {
   });
   const meter = section.querySelector('.inside-meter em');
   const tmp = new THREE.Vector3(), right = new THREE.Vector3();
-  let onState = items.map(() => false), activeIdx = -2;
+  const last = new Float32Array(items.length * 2).fill(NaN);
+  let onState = items.map(() => null), activeIdx = -2, meterShown = '';
   function callouts(tParts) {
-    const on = reduce ? items.map(() => true) : tParts.map((t) => t > 0.5);
-    let active = on.lastIndexOf(true);
-    if (!reduce && isMobile()) active = progress < 0.26 ? -1 : Math.min(items.length - 1, Math.floor((progress - 0.26) / 0.075));
-    items.forEach((li, i) => {
-      if (on[i] !== onState[i]) li.classList.toggle('on', on[i]);
-      li.classList.toggle('current', i === active);
-      if (paths[i]) paths[i].classList.toggle('on', on[i]);
-    });
-    onState = on; activeIdx = active;
-    if (meter) meter.style.transform = 'scaleX(' + cur.explode.toFixed(3) + ')';
-    if (!svg || isMobile()) return;
+    let active = -1;
+    for (let i = 0; i < items.length; i++) {
+      const on = reduce ? true : tParts[i] > 0.5;
+      if (on) active = i;
+      if (on !== onState[i]) { onState[i] = on; items[i].classList.toggle('on', on); if (paths[i]) paths[i].classList.toggle('on', on); }
+    }
+    if (!reduce && mobile) active = progress < 0.26 ? -1 : Math.min(items.length - 1, Math.floor((progress - 0.26) / 0.075));
+    if (active !== activeIdx) { items.forEach((li, i) => li.classList.toggle('current', i === active)); activeIdx = active; }
+    const m = cur.explode.toFixed(2);
+    if (meter && m !== meterShown) { meter.style.transform = 'scaleX(' + m + ')'; meterShown = m; }
+    if (!svg || mobile) return;
     // anchors: each part's edge on the camera's right, projected to the screen
-    const box = stage.getBoundingClientRect(), cr = canvas.getBoundingClientRect();
     right.setFromMatrixColumn(camera.matrixWorld, 0); right.y = 0; right.normalize();
-    compass.parts.forEach((part, i) => {
-      if (!paths[i]) return;
+    for (let i = 0; i < compass.parts.length; i++) {
+      const part = compass.parts[i];
+      if (!paths[i] || !geo.items[i]) continue;
       tmp.copy(right).multiplyScalar(part.r);
       tmp.y = part.group.position.y + part.y;
       tmp.project(camera);
-      const ax = (tmp.x + 1) / 2 * cr.width + cr.left - box.left, ay = (1 - tmp.y) / 2 * cr.height + cr.top - box.top;
-      const r = items[i].getBoundingClientRect();
-      const cx = r.left - box.left - 14, cy = r.top - box.top + 16;
+      const ax = (tmp.x + 1) / 2 * Wd + geo.cl, ay = (1 - tmp.y) / 2 * Hd + geo.ct;
+      if (Math.abs(ax - last[i * 2]) < 0.25 && Math.abs(ay - last[i * 2 + 1]) < 0.25) continue;
+      last[i * 2] = ax; last[i * 2 + 1] = ay;
+      const cx = geo.items[i][0] - 14, cy = geo.items[i][1] + 16;
       const mx = Math.max(ax + 30, cx - 80);
       paths[i].firstChild.setAttribute('d', `M${ax.toFixed(1)} ${ay.toFixed(1)} C${mx.toFixed(1)} ${ay.toFixed(1)} ${(cx - 60).toFixed(1)} ${cy.toFixed(1)} ${cx.toFixed(1)} ${cy.toFixed(1)}`);
       dots[i].setAttribute('cx', ax.toFixed(1)); dots[i].setAttribute('cy', ay.toFixed(1));
-    });
+    }
   }
 
-  /* --- one clock: GSAP's ticker drives the frame --- */
-  let slow = 0, frames = 0;
+  /* --- one clock: GSAP's ticker drives the frame ---
+     The scene is drawn at full rate only while something is really moving (scroll, pointer,
+     a held needle). At rest, the slow sway is drawn at ~30 fps, which looks the same and
+     halves the GPU work. */
+  const EPS = { polar: 0.03, az: 0.03, fit: 0.0006, ty: 0.03, explode: 0.0008, env: 0.002 };
+  let lastDraw = 0, slowFrames = 0, busyFrames = 0;
   function frame(t, deltaMS) {
     if (!visible || document.hidden) return;
     const dt = Math.min(deltaMS / 1000, 0.05);
     time += dt;
     const g = goal();
     const k = reduce ? 1 : 1 - Math.exp(-dt * 5);
-    for (const key of KEYS) cur[key] += (g[key] - cur[key]) * k;
-    pointer.sx += (pointer.x - pointer.sx) * (1 - Math.exp(-dt * 3));
-    pointer.sy += (pointer.y - pointer.sy) * (1 - Math.exp(-dt * 3));
+    let busy = dirty;
+    for (const key of KEYS) { const d = g[key] - cur[key]; if (Math.abs(d) > EPS[key]) busy = true; cur[key] += d * k; }
+    const kp = 1 - Math.exp(-dt * 3);
+    if (Math.abs(pointer.x - pointer.sx) + Math.abs(pointer.y - pointer.sy) > 0.004) busy = true;
+    pointer.sx += (pointer.x - pointer.sx) * kp; pointer.sy += (pointer.y - pointer.sy) * kp;
+    stepNeedle(reduce ? 0 : dt);
+    if (needle.holding || needle.armed || Math.abs(needle.v) > 0.25) busy = true;
+
+    const now = performance.now();
+    if (!busy && now - lastDraw < (reduce ? 400 : 31)) return;
+    lastDraw = now; dirty = false;
 
     // the cursor turns the studio, so the light slides across the metal
     scene.environmentRotation.set(pointer.sy * 0.4, cur.env - pointer.sx * 0.8, 0);
@@ -244,27 +296,35 @@ function boot() {
       p.group.rotation.x = p.tilt * tt;
       return tt;
     });
-    stepNeedle(reduce ? 0 : dt);
     place(cur);
     renderer.render(scene, camera);
     callouts(tParts);
 
-    // adaptive quality: drop resolution if frames run long
-    frames++; if (dt > 0.026) slow++;
-    if (frames === 90) { if (slow > 45 && dpr > 1) { dpr = Math.max(1, dpr - 0.35); resize(); } frames = 0; slow = 0; }
+    // adaptive quality: if busy frames run long, step the resolution down (never back up mid-visit)
+    if (busy) {
+      busyFrames++; if (deltaMS > 24) slowFrames++;
+      if (busyFrames >= 50) {
+        if (slowFrames > 22 && dpr > 0.85) { dpr = Math.max(0.85, dpr - 0.25); measure(); }
+        busyFrames = 0; slowFrames = 0;
+      }
+    }
   }
 
   window.addEventListener('pointermove', (e) => {
     if (e.pointerType === 'touch' || reduce) return;
     pointer.x = e.clientX / window.innerWidth * 2 - 1; pointer.y = e.clientY / window.innerHeight * 2 - 1;
   }, { passive: true });
-  if ('IntersectionObserver' in window) new IntersectionObserver((es) => { visible = es[0].isIntersecting; }, { rootMargin: '200px 0px' }).observe(section);
-  if ('ResizeObserver' in window) new ResizeObserver(resize).observe(canvas); else window.addEventListener('resize', resize);
-  resize();
+  if ('IntersectionObserver' in window) new IntersectionObserver((es) => { visible = es[0].isIntersecting; dirty = true; }, { rootMargin: '100px 0px' }).observe(section);
+
+  // ready: switch the section from the plain list to the tall, sticky stage, and draw the first frame
   html.classList.add('webgl');
+  measure();
+  if ('ResizeObserver' in window) new ResizeObserver(measure).observe(stage); else window.addEventListener('resize', measure);
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(measure);
+  place(cur); renderer.render(scene, camera);
   if (ST) ST.refresh();
   if (window.gsap) window.gsap.ticker.add(frame);
-  else { let last = performance.now(); const loop = (n) => { frame(n, n - last); last = n; requestAnimationFrame(loop); }; requestAnimationFrame(loop); }
+  else { let prev = performance.now(); const loop = (n) => { frame(n, n - prev); prev = n; requestAnimationFrame(loop); }; requestAnimationFrame(loop); }
 }
 
 /* ======================= the studio ======================= */
@@ -345,7 +405,7 @@ function bezelTexture(inner, outer) {
 }
 
 /* ======================= the compass, in millimetres ======================= */
-function lathe(points, segs = 160) {
+function lathe(points, segs = 96) {
   return new THREE.LatheGeometry(points.map(([x, y]) => new THREE.Vector2(x, y)), segs);
 }
 function rounded(pts, r = 0.6, n = 4) {
@@ -377,7 +437,7 @@ function buildCompass() {
     north: new THREE.MeshPhysicalMaterial({ color: '#F4845F', metalness: 0.2, roughness: 0.32, clearcoat: 0.9, clearcoatRoughness: 0.1 }),
     blued: new THREE.MeshPhysicalMaterial({ color: '#3A5EA8', metalness: 1, roughness: 0.2, iridescence: 0.8, iridescenceIOR: 1.7, iridescenceThicknessRange: [180, 520] }),
     // clear glass: mostly see-through, with the studio caught in its clearcoat
-    glass: new THREE.MeshPhysicalMaterial({ color: '#D6F1EC', metalness: 0, roughness: 0.04, transparent: true, opacity: 0.16, clearcoat: 1, clearcoatRoughness: 0.03, envMapIntensity: 1.6, specularIntensity: 1, depthWrite: false, side: THREE.DoubleSide }),
+    glass: new THREE.MeshPhysicalMaterial({ color: '#D6F1EC', metalness: 0, roughness: 0.04, transparent: true, opacity: 0.16, clearcoat: 1, clearcoatRoughness: 0.03, envMapIntensity: 1.6, specularIntensity: 1, depthWrite: false, side: THREE.FrontSide }),
   };
   const parts = [];
   const part = (name, order, lift, r, y, tilt) => { const g = new THREE.Group(); g.name = name; root.add(g); const p = { name, order, lift, r, y, tilt, group: g }; parts.push(p); return g; };
@@ -401,13 +461,13 @@ function buildCompass() {
   // teal enamel bezel with printed ticks and N E S W
   const bezelProfile = rounded([[25.4, 9.1], [29.9, 9.1], [29.9, 10.3], [29.4, 10.95], [25.9, 10.95], [25.4, 10.4], [25.4, 9.1]], 0.45);
   bezel.add(new THREE.Mesh(lathe(bezelProfile), M.enamel));
-  const ring = new THREE.Mesh(new THREE.RingGeometry(25.9, 29.5, 160, 1), M.print);
+  const ring = new THREE.Mesh(new THREE.RingGeometry(25.9, 29.5, 96, 1), M.print);
   ring.rotation.x = -Math.PI / 2; ring.position.y = 10.97; bezel.add(ring);
   const ringUV = ring.geometry.attributes.uv, pos = ring.geometry.attributes.position;
   for (let i = 0; i < ringUV.count; i++) ringUV.setXY(i, pos.getX(i) / 29.5 * 0.5 + 0.5, pos.getY(i) / 29.5 * 0.5 + 0.5);
 
   // gold rose dial
-  const dialMesh = new THREE.Mesh(new THREE.CylinderGeometry(25.3, 25.3, 1, 160), [M.brass, M.dial, M.brass]);
+  const dialMesh = new THREE.Mesh(new THREE.CylinderGeometry(25.3, 25.3, 1, 96), [M.brass, M.dial, M.brass]);
   dialMesh.position.y = 2.75; dialMesh.rotation.y = Math.PI / 2; // cap UVs run along +X; turn the drawn north to -Z
   dial.add(dialMesh);
 
@@ -462,4 +522,22 @@ function makeSound() {
     });
   };
   return { wake, tick, chime };
+}
+
+/* ======================= start-up =======================
+   Nothing 3D is downloaded, parsed or compiled while the page is loading and the hero is
+   animating. The scene is built in idle time once the page has settled, or sooner if the
+   visitor heads straight down the page. */
+if (section) {
+  let started = false;
+  const go = () => { if (!started) { started = true; boot().catch(fail); } };
+  if (section.getBoundingClientRect().top < window.innerHeight * 2) go();
+  else {
+    const whenIdle = (fn) => (window.requestIdleCallback ? requestIdleCallback(fn, { timeout: 3000 }) : setTimeout(fn, 400));
+    const arm = () => setTimeout(() => whenIdle(go), 1600);
+    if (document.readyState === 'complete') arm(); else window.addEventListener('load', arm, { once: true });
+    if ('IntersectionObserver' in window) {
+      new IntersectionObserver((es, io) => { if (es[0].isIntersecting) { io.disconnect(); go(); } }, { rootMargin: '200% 0px' }).observe(section);
+    }
+  }
 }

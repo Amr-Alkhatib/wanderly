@@ -67,7 +67,7 @@
   <div class="search-grid">
     {% for sc in results %}
       {% url 'destination' sc.city.slug as card_href %}
-      {% include "core/_dest_card.html" with sc=sc href=card_href name=sc.city.name %}
+      {% include "core/_dest_card.html" with sc=sc href=card_href name=sc.city.name sizes="(max-width: 640px) 46vw, (max-width: 1180px) 32vw, 24vw" %}
     {% empty %}
       <div class="search-empty">
         <h2>No destinations match those filters.</h2>
