@@ -477,7 +477,10 @@ picture{display:contents}
 
 /* velocity marquee (React Bits ScrollVelocity) */
 .marquee{position:relative;overflow:hidden;padding:clamp(28px,4vw,56px) 0;background:var(--mist);border-bottom:1px solid var(--line)}
-.marquee-row{display:flex;white-space:nowrap;will-change:transform}
+.marquee-row{display:flex;white-space:nowrap;will-change:transform;width:max-content}
+/* nothing in the marquee may shrink: Safari on iOS squeezed the names until they overlapped */
+.marquee-item,.marquee-item > *{flex:none}
+.marquee-item{width:max-content}
 .marquee-row+.marquee-row{margin-top:clamp(4px,1vw,12px)}
 .marquee-item{
   display:inline-flex;align-items:center;gap:clamp(18px,2.4vw,36px);padding-right:clamp(18px,2.4vw,36px);
