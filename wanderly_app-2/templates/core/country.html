@@ -192,8 +192,8 @@
 
     <div class="cp-cta-stack">
       {% if anchor %}
-      {# This page is built around its lead city, so planning starts with that city's itinerary. #}
-      <a href="{% url 'destination' anchor.slug %}?itinerary=1&amp;days=3#tab-itinerary" class="cp-cta-btn" data-magnet>
+      {# This page is built around its lead city, so planning starts with that city's overview. #}
+      <a href="{% url 'destination' anchor.slug %}#tab-overview" class="cp-cta-btn" data-magnet>
         Plan a trip to {{ anchor.name }}
       </a>
       {% else %}
