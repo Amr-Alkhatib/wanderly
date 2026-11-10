@@ -50,8 +50,17 @@ function hasRealGPU() {
   } catch (e) { return false; }
 }
 
-// let the browser breathe between setup steps, so building the scene never shows up as one long stall
-const idle = () => new Promise((r) => (window.requestIdleCallback ? requestIdleCallback(() => r(), { timeout: 250 }) : setTimeout(r, 16)));
+// Setup runs in small steps, and only while the page is NOT being scrolled: each step waits for
+// the scroll to go quiet and for an idle moment, so building the scene never lands on a scrolled frame.
+let lastScroll = 0;
+window.addEventListener('scroll', () => { lastScroll = performance.now(); }, { passive: true });
+const idle = () => new Promise((r) => {
+  const attempt = () => {
+    if (performance.now() - lastScroll < 250) { setTimeout(attempt, 120); return; }
+    if (window.requestIdleCallback) requestIdleCallback(() => r(), { timeout: 300 }); else setTimeout(r, 16);
+  };
+  attempt();
+});
 
 /* Until this finishes, the section is a plain list (the no-WebGL fallback). It is only
    upgraded to the tall, scroll-driven stage once the scene is built and its shaders are
@@ -64,6 +73,7 @@ async function boot() {
   // before three.js is even downloaded. `?force3d` skips the check for testing.
   const force = /[?&]force3d\b/.test(location.search);
   if (!force && !hasRealGPU()) { fail(); return; }
+  await idle();
   THREE = await import('../../vendor/three/three.module.min.js');
   await idle();
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: !lite, alpha: true, failIfMajorPerformanceCaveat: !force });
@@ -88,7 +98,7 @@ async function boot() {
   const camera = new THREE.PerspectiveCamera(24, 1, 1, 2000);
   const target = new THREE.Vector3();
   // metal reads sharp well below retina density; capping it is the biggest single GPU saving
-  const DPR_MAX = Math.min(window.devicePixelRatio || 1, lite ? 1.25 : 1.5);
+  const DPR_MAX = Math.min(window.devicePixelRatio || 1, 1.25);
   let Wd = 1, Hd = 1, dpr = DPR_MAX;
   const cur = { ...SHOTS.enter };
   const pointer = { x: 0, y: 0, sx: 0, sy: 0 };
@@ -261,7 +271,7 @@ async function boot() {
      a held needle). At rest, the slow sway is drawn at ~30 fps, which looks the same and
      halves the GPU work. */
   const EPS = { polar: 0.03, az: 0.03, fit: 0.0006, ty: 0.03, explode: 0.0008, env: 0.002 };
-  let lastDraw = 0, slowFrames = 0, busyFrames = 0;
+  let lastDraw = 0, slowFrames = 0, busyFrames = 0, inView = true;
   function frame(t, deltaMS) {
     if (!visible || document.hidden) return;
     const dt = Math.min(deltaMS / 1000, 0.05);
@@ -276,16 +286,20 @@ async function boot() {
     stepNeedle(reduce ? 0 : dt);
     if (needle.holding || needle.armed || Math.abs(needle.v) > 0.25) busy = true;
 
+    // Taken apart, the compass holds still like a diagram, so at rest nothing is drawn at all.
+    // Assembled, it sways gently, drawn at ~30 fps.
     const now = performance.now();
-    if (!busy && now - lastDraw < (reduce ? 400 : 31)) return;
+    const still = reduce || cur.explode > 0.03 || !inView; // no idle sway while mostly off screen
+    if (!busy && (still || now - lastDraw < 31)) return;
     lastDraw = now; dirty = false;
 
     // the cursor turns the studio, so the light slides across the metal
     scene.environmentRotation.set(pointer.sy * 0.4, cur.env - pointer.sx * 0.8, 0);
     scene.environmentIntensity = 1 + needle.power * 0.35;
-    compass.root.rotation.y = reduce ? -0.35 : Math.sin(time * 0.3) * 0.08 - 0.35 + pointer.sx * 0.12;
+    const sway = reduce ? 0 : 1 - clamp(cur.explode / 0.03); // fades out as the parts lift
+    compass.root.rotation.y = reduce ? -0.35 : Math.sin(time * 0.3) * 0.08 * sway - 0.35 + pointer.sx * 0.12;
     compass.root.rotation.x = reduce ? 0 : pointer.sy * 0.05;
-    compass.root.position.y = reduce ? 0 : Math.sin(time * 0.7) * 0.35;
+    compass.root.position.y = Math.sin(time * 0.7) * 0.35 * sway;
 
     // staggered explode: top parts leave first and come back last
     const e = cur.explode;
@@ -302,7 +316,7 @@ async function boot() {
 
     // adaptive quality: if busy frames run long, step the resolution down (never back up mid-visit)
     if (busy) {
-      busyFrames++; if (deltaMS > 24) slowFrames++;
+      busyFrames++; if (deltaMS > 20) slowFrames++;
       if (busyFrames >= 50) {
         if (slowFrames > 22 && dpr > 0.85) { dpr = Math.max(0.85, dpr - 0.25); measure(); }
         busyFrames = 0; slowFrames = 0;
@@ -314,7 +328,8 @@ async function boot() {
     if (e.pointerType === 'touch' || reduce) return;
     pointer.x = e.clientX / window.innerWidth * 2 - 1; pointer.y = e.clientY / window.innerHeight * 2 - 1;
   }, { passive: true });
-  if ('IntersectionObserver' in window) new IntersectionObserver((es) => { visible = es[0].isIntersecting; dirty = true; }, { rootMargin: '100px 0px' }).observe(section);
+  if ('IntersectionObserver' in window) new IntersectionObserver((es) => { visible = es[0].isIntersecting; dirty = true; }, { rootMargin: '0px' }).observe(section);
+  if ('IntersectionObserver' in window) new IntersectionObserver((es) => { inView = es[0].intersectionRatio > 0.35; }, { threshold: [0, 0.35, 0.6] }).observe(canvas);
 
   // ready: switch the section from the plain list to the tall, sticky stage, and draw the first frame
   html.classList.add('webgl');
