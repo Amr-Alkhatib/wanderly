@@ -51,6 +51,7 @@ Still Django templates, no build step and no frontend framework. The motion laye
 - **GSAP** (ScrollTrigger, SplitText, Flip, CustomEase) and **Lenis** run on one clock: GSAP's ticker drives smooth scrolling, scroll triggers and the 3D frame.
 - **React Bits**, ported to vanilla JS in `bits.js`: SplitText, BlurText, CountUp, ScrollVelocity, TiltedCard, SpotlightCard, Magnet, ClickSpark, DecryptedText, CircularText.
 - **Contour field** (`contours.js`): topographic lines from simplex noise and marching squares. On the home hero the cursor raises the summit.
+- **Dusk over the map** (home hero): soft coral and lagoon light rises in and drifts, the map glides slowly, and six places light up and send out a ring now and then.
 - **The compass** (`compass.js`, three.js): a pocket compass built entirely from code, lit by a small studio baked into the environment. Scrolling takes it apart on camera, and each part is one piece of a score: copper case for budget, enamel bezel for safety, rose dial for climate, blued-steel needle for interests, glass crystal for the explanation. Hold the button to spin the needle; it settles on north and names today's top match.
 - **Strata bars** show every score split into its four factor contributions, wherever a score appears.
 - Visitors who prefer reduced motion get the finished page, phones keep native scrolling, and without WebGL the compass section falls back to a plain list.
@@ -59,6 +60,7 @@ Still Django templates, no build step and no frontend framework. The motion laye
 **Keeping it at 60 fps.** The animations are built so the main thread stays free for scrolling:
 
 - The contour field draws in a **Web Worker** (OffscreenCanvas); `contours.js` is both the page script and its own worker.
+- **No endless CSS animations.** A single infinite CSS animation in the hero makes the browser recomposite the whole hero 60 times a second (it doubled CPU use at rest). So the hero's dusk is drawn by the contour worker instead: pins in the contour canvas it already redraws, the light in a canvas one sixth the size that the browser stretches (redrawn every 480 ms; the glows are too soft for that to show). Both redraw on the same clock beats, so the hero recomposites at most 12.5 times a second at rest.
 - Reveals and the strata bars are **compositor animations** (Web Animations / CSS transitions) started by one IntersectionObserver, not a scroll listener per element.
 - three.js is **not loaded during page load**. The compass is built in idle time, step by step, with shaders compiled in the background, and the section only switches from a plain list to the 3D stage once it is ready. At rest it redraws at ~30 fps, it stops when off screen, and it lowers its resolution if frames run long. Devices without a real GPU keep the plain list (`?force3d` overrides this for testing).
 - Only the nav and the three hero stat cards use `backdrop-filter`; repeated elements (card badges, pills, buttons) use solid tints instead.
