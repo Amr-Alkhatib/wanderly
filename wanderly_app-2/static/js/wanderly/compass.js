@@ -272,6 +272,10 @@ async function boot() {
      halves the GPU work. */
   const EPS = { polar: 0.03, az: 0.03, fit: 0.0006, ty: 0.03, explode: 0.0008, env: 0.002 };
   let lastDraw = 0, slowFrames = 0, busyFrames = 0, inView = true;
+  // low-quality mode (see motion.js): no idle sway, and standard pixel density
+  let low = html.classList.contains('perf-low');
+  window.addEventListener('wanderly:low', () => { low = true; if (dpr > 1) { dpr = 1; measure(); } });
+  if (low) dpr = Math.min(dpr, 1);
   function frame(t, deltaMS) {
     if (!visible || document.hidden) return;
     const dt = Math.min(deltaMS / 1000, 0.05);
@@ -289,7 +293,7 @@ async function boot() {
     // Taken apart, the compass holds still like a diagram, so at rest nothing is drawn at all.
     // Assembled, it sways gently, drawn at ~30 fps.
     const now = performance.now();
-    const still = reduce || cur.explode > 0.03 || !inView; // no idle sway while mostly off screen
+    const still = reduce || low || cur.explode > 0.03 || !inView; // no idle sway while mostly off screen
     if (!busy && (still || now - lastDraw < 31)) return;
     lastDraw = now; dirty = false;
 

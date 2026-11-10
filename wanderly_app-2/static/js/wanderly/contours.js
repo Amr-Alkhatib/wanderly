@@ -292,12 +292,19 @@
     if ('IntersectionObserver' in window) new IntersectionObserver(function (es) { api.show(es[0].isIntersecting); }, { rootMargin: '0px 0px -8% 0px' }).observe(canvas);
     else api.show(true);
     if (live) {
+      // low-quality mode (see motion.js): the lines stay on screen but stop drifting
+      var frozen = false;
+      var freeze = function () { frozen = true; setTimeout(function () { api.pause(true); }, 1900); };
+      if (document.documentElement.classList.contains('perf-low')) freeze();
+      window.addEventListener('wanderly:low', freeze);
+    }
+    if (live) {
       // While the page is scrolling the drift is invisible anyway: hold it, and give the frame to the scroll.
       var scrolling = false, stopTimer = 0;
       window.addEventListener('scroll', function () {
         if (!scrolling) { scrolling = true; api.pause(true); }
         clearTimeout(stopTimer);
-        stopTimer = setTimeout(function () { scrolling = false; api.pause(false); }, 180);
+        stopTimer = setTimeout(function () { scrolling = false; if (!frozen) api.pause(false); }, 180);
       }, { passive: true });
     }
     if (live && finePointer) {
