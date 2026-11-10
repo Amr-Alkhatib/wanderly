@@ -35,7 +35,7 @@
         {% for sc in comparison.scored %}
         <a class="cmp-col-head {% cycle 'ch-a' 'ch-b' 'ch-c' %}" href="{% url 'destination' sc.city.slug %}">
           <picture>
-            <source type="image/webp" srcset="{% static 'images/dest/w/' %}{{ sc.city.image_file|cut:'.png' }}.webp" />
+            {% with stem=sc.city.image_file|cut:'.png' %}<source type="image/webp" srcset="{% static 'images/dest/w/' %}{{ stem }}-760.webp 760w, {% static 'images/dest/w/' %}{{ stem }}.webp 1400w" sizes="(max-width: 980px) 240px, 24vw" />{% endwith %}
             <img src="{% static 'images/dest/' %}{{ sc.city.image_file }}" alt="" loading="lazy" decoding="async" onerror="this.remove();" />
           </picture>
           <div class="cmp-col-country">{{ sc.city.country.name }}</div>

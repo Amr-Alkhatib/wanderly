@@ -37,16 +37,18 @@
     } else run();
   };
 
-  /* ---- BlurText (React Bits <BlurText>): words come out of the blur one by one ---- */
+  /* ---- BlurText (React Bits <BlurText>): the sentence comes out of the blur word by word.
+          The words fade and rise one by one; the blur itself is ONE layer on the whole
+          paragraph, because a filter per word is exactly what makes a laptop GPU stutter. ---- */
   W.blurText = function (el, o) {
     o = o || {};
     if (!ok() || !window.SplitText) { el.style.opacity = 1; return; }
     var split = SplitText.create(el, { type: 'words' });
     gsap.set(el, { opacity: 1 });
+    gsap.fromTo(el, { filter: 'blur(9px)' }, { filter: 'blur(0px)', duration: 1.2, ease: 'power2.out', delay: o.delay || 0, clearProps: 'filter' });
     return gsap.from(split.words, {
-      opacity: 0, filter: 'blur(10px)', y: 8, duration: 0.9, ease: 'power3.out',
-      stagger: o.stagger || 0.035, delay: o.delay || 0,
-      onComplete: function () { gsap.set(split.words, { clearProps: 'filter' }); }
+      opacity: 0, y: 8, duration: 0.9, ease: 'power3.out',
+      stagger: o.stagger || 0.035, delay: o.delay || 0
     });
   };
 
@@ -68,7 +70,7 @@
   };
 
   /* ---- ScrollVelocity (React Bits <ScrollVelocity>): marquee rows that speed up,
-          and turn around, with the scroll ---- */
+          and turn around, with the scroll. One transform write per row per frame. ---- */
   W.scrollVelocity = function (root) {
     var rows = Array.prototype.slice.call(root.querySelectorAll('.marquee-row'));
     if (!rows.length || !ok()) return;
@@ -85,53 +87,75 @@
       }
       return { row: row, w: w, x: i % 2 ? -w : 0, dir: i % 2 ? 1 : -1, base: parseFloat(row.dataset.speed) || 60 };
     });
-    var vel = 0, smooth = 0, sign = 1, visible = true;
+    var vel = 0, smooth = 0, sign = 1, visible = false, skew = 0;
     ScrollTrigger.create({
       trigger: root, start: 'top bottom', end: 'bottom top',
       onUpdate: function (self) { vel = self.getVelocity(); if (vel) sign = vel > 0 ? 1 : -1; },
       onToggle: function (self) { visible = self.isActive; }
     });
-    var skew = gsap.quickTo(rows, 'skewX', { duration: 0.5, ease: 'power3' });
     gsap.ticker.add(function (time, dt) {
       if (!visible) return;
       smooth += (vel - smooth) * 0.08; vel *= 0.9;
       var boost = 1 + Math.min(6, Math.abs(smooth) / 260);
-      var s = dt / 1000;
-      state.forEach(function (st) {
+      var s = Math.min(dt, 50) / 1000;
+      skew += (gsap.utils.clamp(-8, 8, -smooth / 320) - skew) * 0.12;
+      var sk = Math.abs(skew) > 0.02 ? ' skewX(' + skew.toFixed(2) + 'deg)' : '';
+      for (var i = 0; i < state.length; i++) {
+        var st = state[i];
         st.x += st.dir * sign * st.base * boost * s;
         st.x = gsap.utils.wrap(-st.w, 0, st.x);
-        st.row.style.transform = 'translate3d(' + st.x + 'px,0,0)';
-      });
-      skew(gsap.utils.clamp(-8, 8, -smooth / 320));
+        st.row.style.transform = 'translate3d(' + st.x.toFixed(1) + 'px,0,0)' + sk;
+      }
     });
   };
 
-  /* ---- TiltedCard (React Bits <TiltedCard>) ---- */
+  /* pointer handlers read the latest position once per frame, never once per event */
+  function perFrame(fn) {
+    var ev = null;
+    return function (e) {
+      if (ev) { ev = e; return; }
+      ev = e;
+      requestAnimationFrame(function () { var x = ev; ev = null; fn(x); });
+    };
+  }
+
+  /* ---- TiltedCard (React Bits <TiltedCard>). Set up lazily, on first hover. ---- */
   W.tilt = function (el, o) {
     if (!ok() || !W.fine) return;
     o = o || {};
-    var max = o.max || 7;
-    gsap.set(el, { transformPerspective: 1000 });
-    var rx = gsap.quickTo(el, 'rotationX', { duration: 0.6, ease: 'power3' });
-    var ry = gsap.quickTo(el, 'rotationY', { duration: 0.6, ease: 'power3' });
-    var sc = gsap.quickTo(el, 'scale', { duration: 0.6, ease: 'power3' });
-    el.addEventListener('pointermove', function (e) {
-      var r = el.getBoundingClientRect();
-      var x = (e.clientX - r.left) / r.width, y = (e.clientY - r.top) / r.height;
-      ry((x - 0.5) * max * 2); rx((0.5 - y) * max * 2); sc(o.scale || 1.015);
-      el.style.setProperty('--gx', x * 100 + '%'); el.style.setProperty('--gy', y * 100 + '%');
+    var max = o.max || 7, rx, ry, sc, rect = null;
+    el.addEventListener('pointerenter', function () {
+      if (!rx) {
+        gsap.set(el, { transformPerspective: 1000 });
+        rx = gsap.quickTo(el, 'rotationX', { duration: 0.6, ease: 'power3' });
+        ry = gsap.quickTo(el, 'rotationY', { duration: 0.6, ease: 'power3' });
+        sc = gsap.quickTo(el, 'scale', { duration: 0.6, ease: 'power3' });
+      }
+      rect = el.getBoundingClientRect(); // measured once per hover, not per move
+      el.style.willChange = 'transform';
     });
-    el.addEventListener('pointerleave', function () { rx(0); ry(0); sc(1); });
+    el.addEventListener('pointermove', perFrame(function (e) {
+      if (!rect || !rx) return;
+      var x = (e.clientX - rect.left) / rect.width, y = (e.clientY - rect.top) / rect.height;
+      ry((x - 0.5) * max * 2); rx((0.5 - y) * max * 2); sc(o.scale || 1.015);
+      el.style.setProperty('--gx', (x * 100).toFixed(1) + '%'); el.style.setProperty('--gy', (y * 100).toFixed(1) + '%');
+    }));
+    el.addEventListener('pointerleave', function () {
+      rect = null;
+      if (rx) { rx(0); ry(0); sc(1); }
+      setTimeout(function () { if (!rect) el.style.willChange = ''; }, 700);
+    });
+    window.addEventListener('scroll', function () { if (rect) rect = el.getBoundingClientRect(); }, { passive: true });
   };
 
   /* ---- SpotlightCard (React Bits <SpotlightCard>) ---- */
   W.spotlight = function (el) {
     if (!W.fine) return;
-    el.addEventListener('pointermove', function (e) {
+    el.addEventListener('pointermove', perFrame(function (e) {
       var r = el.getBoundingClientRect();
-      el.style.setProperty('--mx', e.clientX - r.left + 'px');
-      el.style.setProperty('--my', e.clientY - r.top + 'px');
-    });
+      el.style.setProperty('--mx', (e.clientX - r.left).toFixed(0) + 'px');
+      el.style.setProperty('--my', (e.clientY - r.top).toFixed(0) + 'px');
+    }));
   };
 
   /* ---- Magnet (React Bits <Magnet>) ---- */
@@ -140,19 +164,21 @@
     if (!ok() || !W.fine) return;
     o = o || {};
     magnets.push({
-      el: el, pad: o.padding || 60, strength: o.strength || 3.2,
+      el: el, pad: o.padding || 60, strength: o.strength || 3.2, on: false,
       x: gsap.quickTo(el, 'x', { duration: 0.5, ease: 'power3' }),
       y: gsap.quickTo(el, 'y', { duration: 0.5, ease: 'power3' })
     });
     if (magnets.length === 1) {
-      window.addEventListener('pointermove', function (e) {
-        magnets.forEach(function (m) {
-          var r = m.el.getBoundingClientRect();
+      window.addEventListener('pointermove', perFrame(function (e) {
+        for (var i = 0; i < magnets.length; i++) {
+          var m = magnets[i], r = m.el.getBoundingClientRect();
           var cx = r.left + r.width / 2, cy = r.top + r.height / 2;
           var near = Math.abs(e.clientX - cx) < r.width / 2 + m.pad && Math.abs(e.clientY - cy) < r.height / 2 + m.pad;
+          if (!near && !m.on) continue; // far away and already at rest: nothing to write
+          m.on = near;
           m.x(near ? (e.clientX - cx) / m.strength : 0); m.y(near ? (e.clientY - cy) / m.strength : 0);
-        });
-      }, { passive: true });
+        }
+      }), { passive: true });
     }
   };
 
@@ -211,12 +237,13 @@
     });
   };
 
-  /* ---- CircularText (React Bits <CircularText>): spins, and speeds up on hover ---- */
+  /* ---- CircularText (React Bits <CircularText>): spins, and speeds up on hover.
+          A Web Animation, so the endless spin runs on the compositor, not in JavaScript. ---- */
   W.circularText = function (el) {
     var svg = el.querySelector('.orbit-text');
-    if (!svg || !ok()) return;
-    var spin = gsap.to(svg, { rotation: 360, duration: 26, ease: 'none', repeat: -1, transformOrigin: '50% 50%' });
-    el.addEventListener('pointerenter', function () { gsap.to(spin, { timeScale: 5, duration: 0.6 }); });
-    el.addEventListener('pointerleave', function () { gsap.to(spin, { timeScale: 1, duration: 1.2 }); });
+    if (!svg || W.reduce || !svg.animate) return;
+    var spin = svg.animate([{ transform: 'rotate(0deg)' }, { transform: 'rotate(360deg)' }], { duration: 26000, iterations: Infinity, easing: 'linear' });
+    el.addEventListener('pointerenter', function () { spin.updatePlaybackRate(5); });
+    el.addEventListener('pointerleave', function () { spin.updatePlaybackRate(1); });
   };
 })();

@@ -54,7 +54,15 @@ Still Django templates, no build step and no frontend framework. The motion laye
 - **The compass** (`compass.js`, three.js): a pocket compass built entirely from code, lit by a small studio baked into the environment. Scrolling takes it apart on camera, and each part is one piece of a score: copper case for budget, enamel bezel for safety, rose dial for climate, blued-steel needle for interests, glass crystal for the explanation. Hold the button to spin the needle; it settles on north and names today's top match.
 - **Strata bars** show every score split into its four factor contributions, wherever a score appears.
 - Visitors who prefer reduced motion get the finished page, phones keep native scrolling, and without WebGL the compass section falls back to a plain list.
-- Destination photos are served as WebP from `static/images/dest/w/`, with the original PNGs as the fallback.
+- Destination photos are served as WebP from `static/images/dest/w/` in two sizes (`srcset`), with the original PNGs as the fallback.
+
+**Keeping it at 60 fps.** The animations are built so the main thread stays free for scrolling:
+
+- The contour field draws in a **Web Worker** (OffscreenCanvas); `contours.js` is both the page script and its own worker.
+- Reveals and the strata bars are **compositor animations** (Web Animations / CSS transitions) started by one IntersectionObserver, not a scroll listener per element.
+- three.js is **not loaded during page load**. The compass is built in idle time, step by step, with shaders compiled in the background, and the section only switches from a plain list to the 3D stage once it is ready. At rest it redraws at ~30 fps, it stops when off screen, and it lowers its resolution if frames run long. Devices without a real GPU keep the plain list (`?force3d` overrides this for testing).
+- Only the nav and the three hero stat cards use `backdrop-filter`; repeated elements (card badges, pills, buttons) use solid tints instead.
+- The results grid uses `content-visibility: auto`, so a page of 100 cards only renders the ones near the screen.
 
 ## Quick start (local, zero config)
 
