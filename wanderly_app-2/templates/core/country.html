@@ -2,71 +2,96 @@
 {% load static %}
 
 {% block title %}{{ country.name }} · Wanderly{% endblock %}
+{% block body_class %}page-place{% endblock %}
 
 {% block content %}
 
 <!-- HERO -->
-<div class="cp-hero">
-  <div class="cp-hero-inner">
+<header class="cp-hero{% if anchor %} cp-hero-photo{% endif %} grain">
+  {% if anchor %}
+  <div class="cp-hero-media">
+    <picture>
+      <source type="image/webp" srcset="{% static 'images/dest/w/' %}{{ anchor.image_file|cut:'.png' }}.webp" />
+      <img src="{% static 'images/dest/' %}{{ anchor.image_file }}" alt="" data-parallax="16"
+           onerror="this.closest('.cp-hero-media').classList.add('img-fallback');this.remove();" />
+    </picture>
+  </div>
+  {% else %}
+  <canvas class="cp-hero-contours" data-contours="static" data-contour-tone="dark" aria-hidden="true"></canvas>
+  {% endif %}
+  <div class="cp-hero-inner wrap">
     <div class="cp-hero-left">
-      <div class="cp-breadcrumb">
-        <a href="{% url 'home' %}">Discover</a> &rsaquo;
-        <a href="{% url 'search' %}?region={{ country.region }}">{{ country.get_region_display }}</a> &rsaquo;
-        <span>{{ country.name }}</span>
-      </div>
-      <h1 class="cp-title">{{ country.name }}</h1>
-      {% if anchor %}<p class="cp-subtitle">{{ anchor.summary }}</p>{% endif %}
+      <nav class="cp-breadcrumb" aria-label="Breadcrumb">
+        <a href="{% url 'home' %}">Discover</a>
+        <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg>
+        <a href="{% url 'search' %}?region={{ country.region }}">{{ country.get_region_display }}</a>
+        <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg>
+        <span aria-current="page">{{ country.name }}</span>
+      </nav>
+      <h1 class="cp-title" data-split="chars" data-split-now>{{ country.name }}</h1>
+      {% if anchor %}<p class="cp-subtitle"><span class="cp-subtitle-country">{{ anchor.name }}</span> {{ anchor.summary }}</p>{% endif %}
     </div>
-    <div class="cp-hero-stats">
+    <div class="cp-hero-stats" data-reveal>
+      {% if scored %}
+      <div class="cp-stat-card cp-stat-score" data-spotlight>
+        <div class="cp-stat-label">Wanderly score{% if anchor %}, {{ anchor.name }}{% endif %}</div>
+        <div class="cp-stat-value"><span data-count>{{ scored.score }}</span><small>/100</small></div>
+        {% include "core/_strata.html" with sc=scored dark=True %}
+      </div>
+      {% endif %}
       {% if latest_safety %}
       <div class="cp-stat-card">
-        <div class="cp-stat-label">Safety Score</div>
-        <div class="cp-stat-value cp-stat-green">{{ latest_safety.safety_score }}/100</div>
+        <div class="cp-stat-label">Safety score</div>
+        <div class="cp-stat-value cp-stat-green"><span data-count>{{ latest_safety.safety_score }}</span><small>/100</small></div>
         <div class="cp-stat-sub">{{ latest_safety.get_level_display }}</div>
       </div>
       {% endif %}
       {% if latest_cost %}
       <div class="cp-stat-card">
-        <div class="cp-stat-label">Budget From</div>
-        <div class="cp-stat-value cp-stat-orange">€{{ latest_cost.daily_budget_eur }}</div>
+        <div class="cp-stat-label">Budget from</div>
+        <div class="cp-stat-value cp-stat-orange">€<span data-count>{{ latest_cost.daily_budget_eur }}</span></div>
         <div class="cp-stat-sub">per day</div>
       </div>
       {% endif %}
     </div>
   </div>
-</div>
+</header>
 
 <!-- INFO BAR -->
-<div class="cp-infobar">
-  <div class="cp-info-card cp-info-orange">
-    <div class="cp-info-label">Language</div>
-    <div class="cp-info-value">{{ country.language }}</div>
+<div class="cp-infobar wrap">
+  <div class="cp-info-card cp-info-orange" data-reveal>
+    <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h9M8.5 3v2M6 5c0 4 3 7 6.5 8.5M11 5c-.8 4-3.6 7.6-7 9"/><path d="m12 21 4.5-10L21 21M13.5 18h6"/></svg>
+    <div><div class="cp-info-label">Language</div>
+    <div class="cp-info-value">{{ country.language }}</div></div>
   </div>
-  <div class="cp-info-card cp-info-green">
-    <div class="cp-info-label">Currency</div>
-    <div class="cp-info-value">{{ country.currency }}</div>
+  <div class="cp-info-card cp-info-green" data-reveal>
+    <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><rect x="2.5" y="6" width="19" height="12" rx="2.5"/><circle cx="12" cy="12" r="2.6"/><path d="M6 9.5v5M18 9.5v5"/></svg>
+    <div><div class="cp-info-label">Currency</div>
+    <div class="cp-info-value">{{ country.currency }}</div></div>
   </div>
-  <div class="cp-info-card cp-info-blue">
-    <div class="cp-info-label">Visa</div>
-    <div class="cp-info-value">{{ country.visa_summary }}</div>
+  <div class="cp-info-card cp-info-blue" data-reveal>
+    <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="2.5" width="14" height="19" rx="2.5"/><circle cx="12" cy="10" r="3"/><path d="M9 17h6"/></svg>
+    <div><div class="cp-info-label">Visa</div>
+    <div class="cp-info-value cp-info-clamp" title="{{ country.visa_summary }}">{{ country.visa_summary }}</div></div>
   </div>
-  <div class="cp-info-card cp-info-yellow">
-    <div class="cp-info-label">Region</div>
-    <div class="cp-info-value">{{ country.get_region_display }}</div>
+  <div class="cp-info-card cp-info-yellow" data-reveal>
+    <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 2.6 3.8 5.6 3.8 9s-1.3 6.4-3.8 9c-2.5-2.6-3.8-5.6-3.8-9S9.5 5.6 12 3z"/></svg>
+    <div><div class="cp-info-label">Region</div>
+    <div class="cp-info-value">{{ country.get_region_display }}</div></div>
   </div>
 </div>
 
 
-<div class="cp-body">
+<div class="cp-body wrap">
 
   <div class="cp-main">
 
     <!-- At a Glance -->
-    <div class="cp-section">
-      <h2 class="cp-section-title">At a Glance</h2>
+    <section class="cp-section">
+      <h2 class="cp-section-title">At a glance</h2>
       {% if latest_safety %}
       <div class="cp-bar-row">
-        <span class="cp-bar-label">Safety Score</span>
+        <span class="cp-bar-label">Safety score</span>
         <div class="cp-bar-track">
           <div class="cp-bar-fill cp-bar-green" style="width: {{ latest_safety.safety_score }}%"></div>
         </div>
@@ -75,7 +100,7 @@
       {% endif %}
       {% if latest_cost and scored %}
       <div class="cp-bar-row">
-        <span class="cp-bar-label">Cost Level</span>
+        <span class="cp-bar-label">Cost level</span>
         <div class="cp-bar-track">
           <div class="cp-bar-fill cp-bar-orange" style="width: {{ scored.score }}%"></div>
         </div>
@@ -84,26 +109,51 @@
       {% endif %}
       {% if scored %}
       <div class="cp-bar-row">
-        <span class="cp-bar-label">Wanderly Score</span>
+        <span class="cp-bar-label">Wanderly score</span>
         <div class="cp-bar-track">
           <div class="cp-bar-fill cp-bar-navy" style="width: {{ scored.score }}%"></div>
         </div>
         <span class="cp-bar-pct">{{ scored.score }}%</span>
       </div>
       {% endif %}
-    </div>
+    </section>
+
+    {% if scored %}
+    <!-- How the score is built -->
+    <section class="cp-section cp-why-section">
+      <div class="cp-why-head">
+        <h2 class="cp-section-title">How {{ anchor.name }} scores</h2>
+        <span class="cp-why-score"><b>{{ scored.score }}</b>/100</span>
+      </div>
+      <div class="factor-table">
+        {% for f in scored.factors %}
+        <div class="factor-row">
+          <span class="factor-row-name"><i class="factor-dot f-{{ f.name|lower }}"></i>{{ f.name }}</span>
+          <span class="factor-meter" title="{{ f.raw_score|floatformat:0 }}/100 before weighting"><i class="f-{{ f.name|lower }}" style="--v: {{ f.raw_score|stringformat:'.1f' }}"></i></span>
+          <span class="factor-pts"><b>{{ f.points|floatformat:0 }}</b> pts</span>
+          <span class="factor-detail">
+            {{ f.raw_score|floatformat:0 }}/100 at {% widthratio f.weight 1 100 %}% weight. {{ f.detail }}
+            {% if f.is_stale %}<span class="stale-flag" title="Built on data older than its freshness window, so treat it as indicative">⚠ Older data</span>{% endif %}
+          </span>
+        </div>
+        {% endfor %}
+      </div>
+    </section>
+    {% endif %}
 
     <!-- Best Time to Visit -->
     {% if weather %}
-    <div class="cp-section">
-      <h2 class="cp-section-title">Best Time to Visit</h2>
+    <section class="cp-section">
+      <div class="cp-months-head">
+        <h2 class="cp-section-title">Best time to visit</h2>
+        <div class="legend"><span><i class="k-budget"></i>Recommended</span><span><i class="k-muted"></i>Average high</span></div>
+      </div>
       <div class="cp-months">
         {% for w in weather %}
-        <div class="cp-month {% if w.is_recommended_month %}cp-month-active{% endif %}">
-          {% if w.month == 1 %}J{% elif w.month == 2 %}F{% elif w.month == 3 %}M
-          {% elif w.month == 4 %}A{% elif w.month == 5 %}M{% elif w.month == 6 %}J
-          {% elif w.month == 7 %}J{% elif w.month == 8 %}A{% elif w.month == 9 %}S
-          {% elif w.month == 10 %}O{% elif w.month == 11 %}N{% elif w.month == 12 %}D{% endif %}
+        <div class="cp-month {% if w.is_recommended_month %}cp-month-active{% endif %}" title="Average high {{ w.avg_high_c }}°C, low {{ w.avg_low_c }}°C, {{ w.rainfall_mm }} mm of rain">
+          <span class="cp-month-temp">{{ w.avg_high_c }}°</span>
+          <span class="cp-month-track"><i class="cp-month-bar" style="--t: {{ w.avg_high_c }}"></i></span>
+          <span class="cp-month-letter">{% if w.month == 1 %}J{% elif w.month == 2 %}F{% elif w.month == 3 %}M{% elif w.month == 4 %}A{% elif w.month == 5 %}M{% elif w.month == 6 %}J{% elif w.month == 7 %}J{% elif w.month == 8 %}A{% elif w.month == 9 %}S{% elif w.month == 10 %}O{% elif w.month == 11 %}N{% elif w.month == 12 %}D{% endif %}</span>
         </div>
         {% endfor %}
       </div>
@@ -112,48 +162,45 @@
         <p class="cp-climate-note">Climate: {{ w.get_climate_type_display }}</p>
         {% endif %}
       {% endfor %}
-    </div>
-    {% endif %}
-
-    <!-- Description -->
-    {% if anchor %}
-    <div class="cp-section">
-      <p class="cp-desc">{{ anchor.summary }}</p>
-    </div>
+    </section>
     {% endif %}
 
   </div>
 
-  <div class="cp-sidebar">
+  <aside class="cp-sidebar">
 
     <div class="cp-sidebar-card">
-      <h3 class="cp-sidebar-title">Regions &amp; Cities</h3>
+      <h3 class="cp-sidebar-title">Regions &amp; cities</h3>
       {% for c in cities %}
       <a class="cp-city-row" href="{% url 'destination' c.slug %}">
         <span>{{ c.name }}</span>
-        <span class="cp-city-arrow">&rarr;</span>
+        <span class="cp-city-arrow"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>
       </a>
       {% endfor %}
     </div>
 
     <div class="cp-sidebar-card">
-      <h3 class="cp-sidebar-title">Practical Info</h3>
-      <p class="cp-practical-row">Visa: {{ country.visa_summary }}</p>
-      <p class="cp-practical-row">Currency: {{ country.currency }}</p>
-      {% if latest_safety %}
-      <p class="cp-practical-row">Health: {{ latest_safety.health_notes }}</p>
-      {% endif %}
+      <h3 class="cp-sidebar-title">Practical info</h3>
+      <div class="cp-practical-table">
+        <div class="cp-practical-row"><span class="cp-practical-label">Visa</span><span class="cp-practical-val">{{ country.visa_summary }}</span></div>
+        <div class="cp-practical-row"><span class="cp-practical-label">Currency</span><span class="cp-practical-val">{{ country.currency }}</span></div>
+        {% if latest_safety %}
+        <div class="cp-practical-row"><span class="cp-practical-label">Health</span><span class="cp-practical-val">{{ latest_safety.health_notes }}</span></div>
+        {% endif %}
+      </div>
     </div>
 
-    <a href="{% url 'search' %}?region={{ country.region }}" class="cp-cta-btn">
-      Plan a Trip to {{ country.name }}
-    </a>
-    <a href="{% url 'compare' %}" class="cp-cta-btn cp-cta-outline">
-      Compare Destination
-    </a>
+    <div class="cp-cta-stack">
+      <a href="{% url 'search' %}?region={{ country.region }}" class="cp-cta-btn" data-magnet>
+        Plan a trip to {{ country.name }}
+      </a>
+      <a href="{% url 'compare' %}" class="cp-cta-btn cp-cta-outline">
+        Compare destinations
+      </a>
+    </div>
 
-  </div>
+  </aside>
 
-</div><
+</div>
 
 {% endblock %}

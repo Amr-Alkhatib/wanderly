@@ -2,23 +2,34 @@
 {% load static %}
 
 {% block title %}Explore Destinations · Wanderly{% endblock %}
+{% block body_class %}page-search{% endblock %}
 
 {% block content %}
-<div class="container" style="padding-top: 32px;">
+<section class="page-head grain">
+  <canvas class="page-head-contours" data-contours="static" data-contour-tone="dark" aria-hidden="true"></canvas>
+  <div class="wrap page-head-inner">
+    <div>
+      <h1 class="page-title" data-split data-split-now>Explore destinations</h1>
+      <p class="page-sub">Every result is ranked by the same transparent score, best match first.</p>
+    </div>
+    <p class="page-head-meta" aria-live="polite"><b data-count>{{ result_count }}</b> destination{{ result_count|pluralize }} found</p>
+  </div>
+</section>
 
-  <h1 style="font-size: 26px; font-weight: 800; margin-bottom: 24px;">Explore Destinations</h1>
+<div class="container">
 
   <!-- Filters -->
-  <form method="get" class="filters-bar">
-    <div class="filter-group" style="flex: 2; min-width: 200px;">
-      <label>Search</label>
-      <div class="search-bar" style="max-width: none; border-radius: 6px;">
-        <input type="text" name="q" value="{{ selected.q }}" placeholder="Country or city…" />
+  <form method="get" class="filters-bar" data-reveal>
+    <div class="filter-group">
+      <label for="f-q">Search</label>
+      <div class="search-bar">
+        <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.6-3.6"/></svg>
+        <input type="text" id="f-q" name="q" value="{{ selected.q }}" placeholder="Country or city" />
       </div>
     </div>
     <div class="filter-group">
-      <label>Region</label>
-      <select name="region">
+      <label for="f-region">Region</label>
+      <select name="region" id="f-region">
         <option value="">All regions</option>
         {% for value, label in regions %}
           <option value="{{ value }}" {% if selected.region == value %}selected{% endif %}>{{ label }}</option>
@@ -26,8 +37,8 @@
       </select>
     </div>
     <div class="filter-group">
-      <label>Budget</label>
-      <select name="budget">
+      <label for="f-budget">Budget</label>
+      <select name="budget" id="f-budget">
         <option value="">Any budget</option>
         {% for value, label in budget_tiers %}
           <option value="{{ value }}" {% if selected.budget == value|stringformat:'s' %}selected{% endif %}>{{ label }}</option>
@@ -35,50 +46,34 @@
       </select>
     </div>
     <div class="filter-group">
-      <label>Category</label>
-      <select name="category">
+      <label for="f-category">Category</label>
+      <select name="category" id="f-category">
         <option value="">All types</option>
         {% for value, label in categories %}
           <option value="{{ value }}" {% if selected.category == value %}selected{% endif %}>{{ label }}</option>
         {% endfor %}
       </select>
     </div>
-    <button class="btn-primary" type="submit">Filter</button>
+    <button class="btn btn-primary" type="submit">Filter</button>
   </form>
 
-  <div class="results-meta">{{ result_count }} destination{{ result_count|pluralize }} found</div>
+  <div class="results-meta">
+    <span>Sorted by Wanderly score, highest first</span>
+    {% if selected.q or selected.region or selected.budget or selected.category %}
+      <a class="view-all" href="{% url 'search' %}">Clear filters</a>
+    {% endif %}
+  </div>
 
   <div class="search-grid">
     {% for sc in results %}
-    <div class="dest-card-wrap">
-      <a class="dest-card" href="{% url 'destination' sc.city.slug %}">
-      <div class="dest-card-img">
-        <img src="{% static 'images/dest/' %}{{ sc.city.image_file }}"
-             alt="{{ sc.city.name }}"
-             onerror="this.parentNode.classList.add('img-fallback');this.remove();" />
-        <span class="img-fallback-glyph">{{ sc.city.emoji }}</span>
-      </div>
-      <div class="dest-card-body">
-        <div class="dest-card-name">{{ sc.city.name }}</div>
-        <div class="dest-card-meta">
-          {{ sc.city.country.get_region_display }}{% if sc.city.safety_label %} · {{ sc.city.safety_label }}{% endif %} · {{ sc.city.budget_symbol }}
-        </div>
-        <div class="dest-card-tags">
-          <span class="score-badge" title="{{ sc.explain }}">{{ sc.score }}/100</span>
-          <span class="pill pill-soft">{{ sc.city.get_primary_category_display }}</span>
-        </div>
-      </div>
-      </a>
-      <button class="trip-save-btn"
-              data-destination="{{ sc.city.slug }}"
-              data-title="{{ sc.city.name }}"
-              onclick="saveTrip(this)"
-              title="Save to trips">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M17 3H7a2 2 0 0 0-2 2v16l7-3 7 3V5a2 2 0 0 0-2-2z"/></svg>
-      </button>
-    </div>
+      {% url 'destination' sc.city.slug as card_href %}
+      {% include "core/_dest_card.html" with sc=sc href=card_href name=sc.city.name %}
     {% empty %}
-      <p style="color:#6B8A99;">No destinations match those filters.</p>
+      <div class="search-empty">
+        <h2>No destinations match those filters.</h2>
+        <p>Try a wider region or budget, or start again from everything.</p>
+        <a class="btn btn-dark" href="{% url 'search' %}">Show all destinations</a>
+      </div>
     {% endfor %}
   </div>
 </div>
