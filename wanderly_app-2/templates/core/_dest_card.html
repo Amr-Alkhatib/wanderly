@@ -4,7 +4,7 @@
     <span class="dest-card-img">
       <picture>
         {% with stem=sc.city.image_file|cut:'.png' %}<source type="image/webp" srcset="{% static 'images/dest/w/' %}{{ stem }}-760.webp 760w, {% static 'images/dest/w/' %}{{ stem }}.webp 1400w" sizes="{{ sizes|default:'(max-width: 640px) 82vw, (max-width: 1180px) 46vw, 24vw' }}" />{% endwith %}
-        <img src="{% static 'images/dest/' %}{{ sc.city.image_file }}"
+        <img src="{% static 'images/dest/w/' %}{{ sc.city.image_file|cut:'.png' }}.webp\"
              alt="{{ name }}" loading="lazy" decoding="async"
              onerror="this.parentNode.classList.add('img-fallback');this.remove();" />
       </picture>

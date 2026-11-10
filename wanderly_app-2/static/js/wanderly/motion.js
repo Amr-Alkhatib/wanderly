@@ -54,13 +54,51 @@
   var t0 = arriving ? 0.45 : 0.08;
   var fontsReady = document.fonts ? Promise.race([document.fonts.ready, new Promise(function (r) { setTimeout(r, 1200); })]) : Promise.resolve();
 
+  /* ---------- automatic quality ----------
+     The page watches its own frame rate. If this device cannot hold about 45 fps, the
+     continuous extras are switched off for the rest of the visit: smooth-scroll easing (the
+     browser's own scrolling takes over), the drifting contour lines (they stay, but still),
+     the compass's idle sway and the photo-glass blur. Entrances, counters, tilt, the compass
+     itself and everything that answers a click or a scroll stay on. */
+  try { W.low = sessionStorage.getItem('w:low') === '1'; } catch (e) { W.low = false; }
+  if (/[?&]quality=high\b/.test(location.search)) W.low = false;
+  if (/[?&]quality=low\b/.test(location.search)) W.low = true;
+  if (W.low) html.classList.add('perf-low');
+  safe(function () {
+    if (W.low || W.reduce || /[?&]quality=high\b/.test(location.search)) return;
+    var frames = 0, winStart = 0, bad = 0, armed = false;
+    setTimeout(function () { armed = true; }, 2500); // ignore the load itself
+    function goLow() {
+      W.low = true; html.classList.add('perf-low');
+      try { sessionStorage.setItem('w:low', '1'); } catch (e) {}
+      window.dispatchEvent(new Event('wanderly:low'));
+    }
+    document.addEventListener('visibilitychange', function () { winStart = 0; bad = 0; }); // a hidden tab is not a slow one
+    function tick(now) {
+      if (W.low) return;
+      requestAnimationFrame(tick);
+      if (!armed || document.hidden) return;
+      if (!winStart) { winStart = now; frames = 0; return; }
+      frames++;
+      if (now - winStart < 2000) return;
+      var fps = frames / (now - winStart) * 1000;
+      winStart = now; frames = 0;
+      bad = fps < 45 ? bad + 1 : 0;
+      if (bad >= 2) goLow();                    // two 2-second windows in a row
+    }
+    requestAnimationFrame(tick);
+  });
+
   /* ---------- smooth scroll (Lenis on a fine pointer only) ---------- */
   safe(function () {
     if (W.reduce || !W.fine || !window.Lenis || !window.ScrollTrigger) return;
+    if (W.low) return; // this device already showed it cannot keep up: native scrolling
     var lenis = new Lenis({ lerp: 0.1, smoothWheel: true });
     W.lenis = lenis;
     lenis.on('scroll', ScrollTrigger.update);
-    gsap.ticker.add(function (t) { lenis.raf(t * 1000); });
+    var lenisRaf = function (t) { lenis.raf(t * 1000); };
+    gsap.ticker.add(lenisRaf);
+    window.addEventListener('wanderly:low', function () { gsap.ticker.remove(lenisRaf); lenis.destroy(); W.lenis = null; });
     gsap.ticker.lagSmoothing(0);
     document.addEventListener('click', function (e) {
       if (e.defaultPrevented) return;

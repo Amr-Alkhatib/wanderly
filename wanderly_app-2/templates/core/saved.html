@@ -40,7 +40,7 @@
         {% if trip.city %}
           <picture>
             {% with stem=trip.city.image_file|cut:'.png' %}<source type="image/webp" srcset="{% static 'images/dest/w/' %}{{ stem }}-760.webp 760w, {% static 'images/dest/w/' %}{{ stem }}.webp 1400w" sizes="(max-width: 640px) 100vw, (max-width: 1180px) 48vw, 31vw" />{% endwith %}
-            <img src="{% static 'images/dest/' %}{{ trip.city.image_file }}"
+            <img src="{% static 'images/dest/w/' %}{{ trip.city.image_file|cut:'.png' }}.webp\"
                  alt="{{ trip.city.name }}" loading="lazy" decoding="async"
                  onerror="this.parentNode.classList.add('img-fallback');this.remove();" />
           </picture>

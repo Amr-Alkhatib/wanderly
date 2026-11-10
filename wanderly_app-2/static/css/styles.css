@@ -850,3 +850,8 @@ html:not(.webgl) .callout,html:not(.motion-ok) .callout{opacity:1;transform:none
 @media (prefers-reduced-motion:reduce){
   *,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important;scroll-behavior:auto!important}
 }
+
+/* ---------- low-quality mode: set by motion.js when the device cannot hold ~45 fps ---------- */
+.perf-low .grain::after{display:none}
+.perf-low .cp-stat-card{-webkit-backdrop-filter:none;backdrop-filter:none;background:rgba(11,34,48,.82)}
+.perf-low .dest-card-glare{display:none}

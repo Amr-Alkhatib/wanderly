@@ -133,7 +133,7 @@
             <span class="pick-thumb">
               <picture>
                 <source type="image/webp" srcset="{% static 'images/dest/w/' %}{{ sc.city.image_file|cut:'.png' }}-760.webp" />
-                <img src="{% static 'images/dest/' %}{{ sc.city.image_file }}"
+                <img src="{% static 'images/dest/w/' %}{{ sc.city.image_file|cut:'.png' }}.webp\"
                      alt="" loading="lazy" decoding="async"
                      onerror="this.parentNode.classList.add('img-fallback');this.remove();" />
               </picture>
