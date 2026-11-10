@@ -264,9 +264,9 @@ body.sheet-open{overflow:hidden}
 .footer-links a:hover{color:#fff}
 .footer-word{
   font-weight:800;font-stretch:75%;letter-spacing:-.035em;line-height:.8;
-  font-size:clamp(5.5rem,25vw,23rem);color:transparent;
+  /* a plain tint: a gradient clipped to letters this large was slow to paint as the footer scrolled in */
+  font-size:clamp(5.5rem,25vw,23rem);color:rgba(234,242,244,.07);
   margin:clamp(40px,6vw,80px) 0 18px;user-select:none;white-space:nowrap;
-  background:linear-gradient(180deg,rgba(234,242,244,.10) 0%,rgba(234,242,244,.02) 85%);-webkit-background-clip:text;background-clip:text;
 }
 .footer-bottom{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap;padding-top:20px;border-top:1px solid var(--line-dark);font-size:13px;color:var(--on-dark-3)}
 .footer-tag{font-family:var(--serif);font-style:italic;font-size:15px}
@@ -274,17 +274,18 @@ body.sheet-open{overflow:hidden}
 /* ---------- page transition ---------- */
 .pt{
   position:fixed;inset:0;z-index:500;pointer-events:none;background:var(--harbour);
-  display:grid;place-items:center;visibility:hidden;clip-path:inset(100% 0 0 0);
+  /* the curtain slides with transform (compositor); animating clip-path repainted the whole screen each frame */
+  display:grid;place-items:center;visibility:hidden;transform:translateY(100%);will-change:transform;
 }
 .pt-pin{width:46px;height:46px;opacity:0;transform:translateY(10px)}
 .pt-pin path{fill:var(--sunset)}
 .pt-pin .pt-river{fill:none;stroke:#fff;stroke-width:1.7;stroke-linecap:round}
 html.pt-leaving .pt{visibility:visible;animation:pt-cover .5s var(--ease) forwards}
 html.pt-leaving .pt-pin{animation:pt-pin .5s var(--ease) .12s forwards}
-html.pt-arrive .pt{visibility:visible;clip-path:inset(0);animation:pt-reveal .8s var(--ease) .08s forwards}
+html.pt-arrive .pt{visibility:visible;transform:none;animation:pt-reveal .8s var(--ease) .08s forwards}
 html.pt-arrive .pt-pin{opacity:1;transform:none;animation:pt-pin-out .35s ease forwards}
-@keyframes pt-cover{from{clip-path:inset(100% 0 0 0)}to{clip-path:inset(0)}}
-@keyframes pt-reveal{from{clip-path:inset(0)}to{clip-path:inset(0 0 100% 0);visibility:hidden}}
+@keyframes pt-cover{from{transform:translateY(100%)}to{transform:none}}
+@keyframes pt-reveal{from{transform:none}to{transform:translateY(-100%);visibility:hidden}}
 @keyframes pt-pin{to{opacity:1;transform:none}}
 @keyframes pt-pin-out{to{opacity:0;transform:translateY(-10px)}}
 
