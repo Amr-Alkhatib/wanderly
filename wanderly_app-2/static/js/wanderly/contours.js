@@ -8,7 +8,13 @@
    scrolling. Browsers without OffscreenCanvas run the same engine on the page.
    Static fields are traced once per size and cached; only live fields animate.
 
-   Usage: <canvas data-contours="live|static" data-contour-tone="dark|light"> */
+   The home hero's "dusk" is drawn here too, so it costs no CSS animation: the live field glides
+   (an offset into the noise), draws the map pins in the same pass (data-contour-pins="<id>" names
+   the still pins whose boxes give their places), and a Sky paints the drifting light into a canvas
+   one sixth the size, which the browser stretches. Every animated canvas draws on the same clock
+   beats, so the page recomposites at most once per beat (12.5 times a second at rest).
+
+   Usage: <canvas data-contours="live|static" data-contour-tone="dark|light">, <canvas data-sky> */
 (function () {
   'use strict';
   var IS_WORKER = typeof window === 'undefined' && typeof self !== 'undefined' && typeof self.postMessage === 'function';
@@ -82,7 +88,9 @@
     this.introMs = o.intro ? (this.live ? 1800 : 1600) : 0;
     this.started = this.live || !o.intro ? this.now() : Infinity;
     this.introDone = !o.intro;
-    this.last = 0; this.poked = 0; this.paused = false;
+    this.last = 0; this.poked = 0; this.paused = false; this.beat = -1;
+    // the glide over the map (px into the noise) and the places drawn on it
+    this.ox = 0; this.oy = 0; this.pins = null; this.calm = false;
     // one segment buffer per level, reused every frame
     this.seg = []; this.segN = new Int32Array(LEVELS);
     for (var k = 0; k < LEVELS; k++) this.seg.push(new Float32Array(4096));
@@ -99,11 +107,12 @@
   Field.prototype.sample = function () {
     var f = 0.0021 / this.scale, n = this.noise, t = this.t, cell = this.cell, cols = this.cols, rows = this.rows, field = this.field;
     var sx = this.px * this.W, sy = this.py * this.H, sig = Math.min(this.W, this.H) * 0.22, inv = 1 / (2 * sig * sig), amp = this.amp * 1.6;
+    var ox = this.ox, oy = this.oy;
     for (var j = 0; j < rows; j++) {
-      var y = j * cell, dy = y - sy, row = j * cols;
+      var y = j * cell, dy = y - sy, row = j * cols, ny = (y + oy) * f;
       for (var i = 0; i < cols; i++) {
-        var x = i * cell;
-        var v = n(x * f, y * f, t) * 0.9 + n(x * f * 2.3, y * f * 2.3, t * 1.4 + 7) * 0.35;
+        var x = i * cell, nx = (x + ox) * f;
+        var v = n(nx, ny, t) * 0.9 + n(nx * 2.3, ny * 2.3, t * 1.4 + 7) * 0.35;
         if (amp > 0.0016) { var dx = x - sx; v += amp * Math.exp(-(dx * dx + dy * dy) * inv); }
         field[row + i] = v;
       }
@@ -178,6 +187,35 @@
     }
     ctx.globalAlpha = 1;
     if (intro >= 1) this.introDone = true;
+    if (this.pins) this.drawPins(ctx, now);
+  };
+  var SUNSET = [244, 132, 95], LAGOON = [125, 224, 214];
+  function clamp01(v) { return v < 0 ? 0 : v > 1 ? 1 : v; }
+  // Places light up one by one (from 0.6s), then each sends out a slow ring every 6.6s.
+  Field.prototype.drawPins = function (ctx, now) {
+    var P = this.pins, t = now - this.started, TAU = 6.2832;
+    for (var k = 0; k < P.length; k++) {
+      var p = P[k], c = p.lagoon ? LAGOON : SUNSET, x = p.x * this.W, y = p.y * this.H;
+      var e = this.calm ? 1 : clamp01((t - 600 - p.d * 220) / 900);
+      if (e <= 0) continue;
+      e = 1 - Math.pow(1 - e, 4);
+      var s = 0.2 + 0.8 * e, a = 0.9 * e, R = 17 * s;
+      var g = ctx.createRadialGradient(x, y, 0, x, y, R);
+      g.addColorStop(0, rgba(c, 0.42 * a)); g.addColorStop(0.3, rgba(c, 0.2 * a)); g.addColorStop(1, rgba(c, 0));
+      ctx.fillStyle = g; ctx.fillRect(x - R, y - R, R * 2, R * 2);
+      ctx.fillStyle = rgba(c, (p.lagoon ? 0.14 : 0.16) * a);
+      ctx.beginPath(); ctx.arc(x, y, 6.5 * s, 0, TAU); ctx.fill();
+      ctx.fillStyle = rgba(c, a);
+      ctx.beginPath(); ctx.arc(x, y, 3.5 * s, 0, TAU); ctx.fill();
+      if (this.calm) continue;
+      var rt = t - 1500 - p.d * 1100;
+      if (rt <= 0) continue;
+      var ph = (rt % 6600) / 6600;
+      if (ph >= 0.55) continue;
+      var q = 1 - Math.pow(1 - ph / 0.55, 3);
+      ctx.strokeStyle = rgba(c, 0.75 * (1 - q)); ctx.lineWidth = 1.5 + q * 1.5;
+      ctx.beginPath(); ctx.arc(x, y, 4.5 + 22.5 * q, 0, TAU); ctx.stroke();
+    }
   };
   Field.prototype.show = function (v, now) {
     this.visible = v;
@@ -193,9 +231,10 @@
   Field.prototype.frame = function (now) {
     if (!this.live) { this.draw(now); return; }
     // 25 fps while the pointer is steering the summit; the slow idle drift needs only half that
-    if (now - this.last < (now - this.poked < 1500 || now - this.started < 2500 ? 40 : 80)) return;
+    if (!onBeat(this, now, now - this.poked < 1500 || now - this.started < 2500 ? 40 : 80)) return;
     var dt = Math.min(0.1, (now - this.last) / 1000); this.last = now;
     this.t += dt * 0.045;
+    this.ox += dt * 4; this.oy += dt * 1.5; // the slow glide: the land drifts up and to the left
     if (!this.pointerIn) {
       var w = now / 1000;
       this.tx = 0.62 + Math.sin(w * 0.11) * 0.22; this.ty = 0.42 + Math.cos(w * 0.083) * 0.2;
@@ -204,6 +243,67 @@
     this.trace();
     this.draw(now);
   };
+
+  // Animated canvases draw on shared clock beats (every 40, 80 or 480 ms, each a multiple of the
+  // last), so when several move they change in the same frame and the page recomposites once.
+  function onBeat(o, now, every) {
+    var b = now - now % every;
+    if (b <= o.beat) return false;
+    o.beat = b; return true;
+  }
+
+  /* ---- the sky: three soft glows of dusk light, rising in and then drifting ----
+     Sizes and places mirror the .glow spans in styles.css (vmax units, relative to the hero box);
+     drift is a slow cosine sway, the same path the CSS used to animate. */
+  var GLOWS = [
+    // colour, stops [offset, alpha], diameter (vmax), entrance [delay s, length s], sway [s, dx, dy (vmax), scale]
+    { c: SUNSET, stops: [[0, 0.34], [0.45, 0.13], [1, 0]], size: 78, at: function (W, H, v) { return [15 * v, H + 5 * v]; },
+      intro: [0.15, 2.6], rise: true, sway: [26, 9, -5, 1.12] },
+    { c: [46, 156, 148], stops: [[0, 0.30], [0.5, 0.10], [1, 0]], size: 86, at: function (W, H, v) { return [W - 17 * v, v]; },
+      intro: [0, 2.4], sway: [34, -11, 7, 0.92] },
+    { c: [122, 166, 228], stops: [[0, 0.13], [1, 0]], size: 52, at: function (W, H, v) { return [0.3 * W + 26 * v, 0.18 * H + 26 * v]; },
+      intro: [0.4, 3], sway: [22, -14, -6, 1.15] }
+  ];
+  var SKY_SCALE = 1 / 6; // soft light needs no detail: a sixth of the size, stretched by the browser
+  function Sky(canvas) {
+    this.canvas = canvas; this.ctx = canvas.getContext('2d');
+    this.W = 1; this.H = 1; this.v = 1;
+    this.started = this.now(); this.visible = true; this.paused = false; this.beat = -1;
+  }
+  Sky.prototype.now = Field.prototype.now;
+  Sky.prototype.resize = function (w, h, vmax) {
+    this.W = Math.max(1, w); this.H = Math.max(1, h); this.v = (vmax || Math.max(w, h)) / 100;
+    this.canvas.width = Math.max(2, Math.ceil(this.W * SKY_SCALE)); this.canvas.height = Math.max(2, Math.ceil(this.H * SKY_SCALE));
+    this.draw(this.now());
+  };
+  Sky.prototype.show = function (v) { this.visible = v; };
+  Sky.prototype.wants = function () { return this.visible && !this.paused; };
+  // Smooth (every 40 ms) while the light rises in; then every 480 ms. The glows are so soft that a
+  // half-second of drift moves them a few pixels and changes no pixel by even one colour level,
+  // so redrawing more often would only cost the browser a new frame for nothing.
+  Sky.prototype.frame = function (now) {
+    if (onBeat(this, now, now - this.started < 3600 ? 40 : 480)) this.draw(now);
+  };
+  Sky.prototype.draw = function (now) {
+    var ctx = this.ctx, W = this.W, H = this.H, v = this.v, t = (now - this.started) / 1000;
+    ctx.setTransform(this.canvas.width / W, 0, 0, this.canvas.height / H, 0, 0);
+    ctx.clearRect(0, 0, W, H);
+    for (var k = 0; k < GLOWS.length; k++) {
+      var g = GLOWS[k], end = g.intro[0] + g.intro[1];
+      var e = clamp01((t - g.intro[0]) / g.intro[1]);
+      if (e <= 0) continue;
+      e = g.rise ? 1 - Math.pow(1 - e, 4) : 1 - (1 - e) * (1 - e);
+      var sw = t > end ? 0.5 - 0.5 * Math.cos(Math.PI * (t - end) / g.sway[0]) : 0;
+      var at = g.at(W, H, v), r = g.size * v / 2;
+      var cx = at[0] + g.sway[1] * v * sw, cy = at[1] + g.sway[2] * v * sw;
+      r *= 1 + (g.sway[3] - 1) * sw;
+      if (g.rise) { cy += 0.22 * g.size * v * (1 - e); r *= 0.9 + 0.1 * e; }
+      var grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, r);
+      for (var q = 0; q < g.stops.length; q++) grad.addColorStop(g.stops[q][0], rgba(g.c, g.stops[q][1] * e));
+      ctx.fillStyle = grad; ctx.fillRect(cx - r, cy - r, r * 2, r * 2);
+    }
+  };
+  function make(canvas, o) { return o.kind === 'sky' ? new Sky(canvas) : new Field(canvas, o); }
 
   /* ======================= worker side ======================= */
   if (IS_WORKER) {
@@ -218,10 +318,12 @@
     var kick = function () { if (!running) { running = true; raf(tick); } };
     self.onmessage = function (e) {
       var m = e.data, f = fields[m.id];
-      if (m.type === 'add') { f = fields[m.id] = new Field(m.canvas, m.opts); f.resize(m.w, m.h); kick(); return; }
+      if (m.type === 'add') { f = fields[m.id] = make(m.canvas, m.opts); f.resize(m.w, m.h, m.vmax); kick(); return; }
       if (m.type === 'page') { pageHidden = m.hidden; if (!pageHidden) kick(); return; }
       if (!f) return;
-      if (m.type === 'size') f.resize(m.w, m.h);
+      if (m.type === 'size') f.resize(m.w, m.h, m.vmax);
+      else if (m.type === 'pins') f.pins = m.pins;
+      else if (m.type === 'calm') f.calm = true;
       else if (m.type === 'visible') { f.show(m.v, performance.now()); if (m.v) kick(); }
       else if (m.type === 'pointer') f.pointer(m.x, m.y, m.inside);
       else if (m.type === 'pause') { f.paused = m.v; if (!m.v) kick(); }
@@ -251,10 +353,24 @@
     return worker;
   }
 
+  function vmax() { return Math.max(window.innerWidth, window.innerHeight); }
+  // where the still pins sit at this size (hidden ones skipped), as fractions of their box
+  function readPins(box) {
+    var W = box.offsetWidth, H = box.offsetHeight, out = [];
+    if (!W || !H) return out;
+    Array.prototype.forEach.call(box.querySelectorAll('i'), function (p, k) {
+      if (!p.offsetWidth) return;
+      out.push({ x: (p.offsetLeft + p.offsetWidth / 2) / W, y: (p.offsetTop + p.offsetHeight / 2) / H,
+        d: parseFloat(p.style.getPropertyValue('--d')) || k, lagoon: p.classList.contains('is-lagoon') });
+    });
+    return out;
+  }
+
   function mount(canvas) {
     if (canvas.__contours) return canvas.__contours;
-    var live = canvas.dataset.contours === 'live' && !reduce;
-    var opts = {
+    var sky = canvas.hasAttribute('data-sky');
+    var live = sky || (canvas.dataset.contours === 'live' && !reduce);
+    var opts = sky ? { kind: 'sky' } : {
       live: live,
       tone: canvas.dataset.contourTone,
       seed: parseInt(canvas.dataset.contourSeed, 10) || Math.floor(Math.random() * 1e6) + 1,
@@ -268,23 +384,29 @@
       // entrance is what made each page stutter on load and again on reaching the footer.
       intro: live && !reduce && canvas.dataset.contourIntro !== 'off'
     };
+    var pinBox = live && !sky && canvas.dataset.contourPins ? document.getElementById(canvas.dataset.contourPins) : null;
     var fade = !live && !reduce && canvas.dataset.contourIntro !== 'off' && !!canvas.animate;
     var r = canvas.getBoundingClientRect();
     var api;
     var w = canWorker ? getWorker() : null; // the worker must exist before a canvas is handed over
     if (w) {
       var id = nextId++, off = canvas.transferControlToOffscreen();
-      w.postMessage({ type: 'add', id: id, canvas: off, opts: opts, w: r.width, h: r.height }, [off]);
+      w.postMessage({ type: 'add', id: id, canvas: off, opts: opts, w: r.width, h: r.height, vmax: vmax() }, [off]);
       handed.push(canvas);
       var post = function (m) { if (worker === w) w.postMessage(m); };
       api = {
-        resize: function (wd, ht) { post({ type: 'size', id: id, w: wd, h: ht }); },
+        resize: function (wd, ht) { post({ type: 'size', id: id, w: wd, h: ht, vmax: vmax() }); },
         show: function (v) { post({ type: 'visible', id: id, v: v }); },
         pointer: function (x, y, inside) { post({ type: 'pointer', id: id, x: x, y: y, inside: inside }); },
-        pause: function (v) { post({ type: 'pause', id: id, v: v }); }
+        pause: function (v) { post({ type: 'pause', id: id, v: v }); },
+        pins: function (list) { post({ type: 'pins', id: id, pins: list }); },
+        calm: function () { post({ type: 'calm', id: id }); }
       };
     } else api = mainThread(canvas, opts, r);
     canvas.__contours = api;
+    // the canvas now draws the moving version, so the still one steps aside
+    if (sky && canvas.parentNode) canvas.parentNode.classList.add('is-drawn');
+    if (pinBox) { api.pins(readPins(pinBox)); pinBox.classList.add('is-drawn'); }
 
     // keep the field sized to its box, and only animate it while it is on screen
     var lastW = r.width, lastH = r.height;
@@ -292,6 +414,7 @@
       var b = es[0].contentRect;
       if (Math.abs(b.width - lastW) < 1 && Math.abs(b.height - lastH) < 1) return;
       lastW = b.width; lastH = b.height; api.resize(b.width, b.height);
+      if (pinBox) api.pins(readPins(pinBox)); // breakpoints move the pins
     }).observe(canvas);
     if ('IntersectionObserver' in window) new IntersectionObserver(function (es) {
       var on = es[0].isIntersecting;
@@ -302,8 +425,14 @@
     if (live) {
       // low-quality mode (see motion.js): the lines stay on screen but stop drifting
       var frozen = false;
-      var freeze = function () { frozen = true; setTimeout(function () { api.pause(true); }, 1900); };
-      if (document.documentElement.classList.contains('perf-low')) freeze();
+      // (the pins settle without their rings; the sky stops once its light has risen in)
+      var freeze = function () {
+        if (frozen) return;
+        frozen = true; api.calm(); setTimeout(function () { api.pause(true); }, sky ? 3700 : 1900);
+      };
+      var isLow = function () { if (document.documentElement.classList.contains('perf-low')) freeze(); };
+      // the sky mounts while this deferred script runs, before motion.js has set the mode: look again after it
+      isLow(); setTimeout(isLow, 0);
       window.addEventListener('wanderly:low', freeze);
     }
     if (live) {
@@ -315,7 +444,7 @@
         stopTimer = setTimeout(function () { scrolling = false; if (!frozen) api.pause(false); }, 180);
       }, { passive: true });
     }
-    if (live && finePointer) {
+    if (live && !sky && finePointer) {
       var pending = null;
       window.addEventListener('pointermove', function (e) {
         if (pending) { pending = e; return; }
@@ -334,18 +463,20 @@
 
   // fallback: same engine on the page, driven by requestAnimationFrame
   function mainThread(canvas, opts, r) {
-    var f = new Field(canvas, opts), running = false;
-    f.resize(r.width, r.height);
+    var f = make(canvas, opts), running = false;
+    f.resize(r.width, r.height, vmax());
     var loop = function (now) {
       if (!document.hidden && f.wants()) { f.frame(now); requestAnimationFrame(loop); } else running = false;
     };
     var kick = function () { if (!running) { running = true; requestAnimationFrame(loop); } };
     document.addEventListener('visibilitychange', kick);
     return {
-      resize: function (w, h) { f.resize(w, h); },
+      resize: function (w, h) { f.resize(w, h, vmax()); },
       show: function (v) { f.show(v, performance.now()); if (v) kick(); },
       pointer: function (x, y, inside) { f.pointer(x, y, inside); },
-      pause: function (v) { f.paused = v; if (!v) kick(); }
+      pause: function (v) { f.paused = v; if (!v) kick(); },
+      pins: function (list) { f.pins = list; },
+      calm: function () { f.calm = true; }
     };
   }
 
@@ -357,6 +488,9 @@
       if (c.dataset.contours === 'live' && !reduce) setTimeout(function () { mount(c); }, 900);
       else mount(c);
     });
+    // the light is a few hundred pixels to paint, so it rises in with the headline
+    // (with reduced motion the still glows stay instead)
+    if (!reduce) document.querySelectorAll('canvas[data-sky]').forEach(mount);
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot); else boot();
 })();
