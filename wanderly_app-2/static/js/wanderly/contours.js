@@ -82,7 +82,7 @@
     this.introMs = o.intro ? (this.live ? 1800 : 1600) : 0;
     this.started = this.live || !o.intro ? this.now() : Infinity;
     this.introDone = !o.intro;
-    this.last = 0;
+    this.last = 0; this.poked = 0; this.paused = false;
     // one segment buffer per level, reused every frame
     this.seg = []; this.segN = new Int32Array(LEVELS);
     for (var k = 0; k < LEVELS; k++) this.seg.push(new Float32Array(4096));
@@ -184,15 +184,16 @@
     if (v && this.started === Infinity) this.started = now; // static intro, first time on screen
   };
   Field.prototype.pointer = function (x, y, inside) {
-    this.pointerIn = inside;
+    this.pointerIn = inside; this.poked = this.now();
     if (inside) { this.tx = x; this.ty = y; this.tamp = 0.85; } else this.tamp = 0.55;
   };
   Field.prototype.wants = function () {
-    return this.visible && (this.live || (!this.introDone && this.started !== Infinity));
+    return this.visible && !this.paused && (this.live || (!this.introDone && this.started !== Infinity));
   };
   Field.prototype.frame = function (now) {
     if (!this.live) { this.draw(now); return; }
-    if (now - this.last < 40) return; // ~25 fps is plenty for drifting terrain
+    // 25 fps while the pointer is steering the summit; the slow idle drift needs only half that
+    if (now - this.last < (now - this.poked < 1500 || now - this.started < 2500 ? 40 : 80)) return;
     var dt = Math.min(0.1, (now - this.last) / 1000); this.last = now;
     this.t += dt * 0.045;
     if (!this.pointerIn) {
@@ -223,6 +224,7 @@
       if (m.type === 'size') f.resize(m.w, m.h);
       else if (m.type === 'visible') { f.show(m.v, performance.now()); if (m.v) kick(); }
       else if (m.type === 'pointer') f.pointer(m.x, m.y, m.inside);
+      else if (m.type === 'pause') { f.paused = m.v; if (!m.v) kick(); }
     };
     return;
   }
@@ -274,7 +276,8 @@
       api = {
         resize: function (wd, ht) { post({ type: 'size', id: id, w: wd, h: ht }); },
         show: function (v) { post({ type: 'visible', id: id, v: v }); },
-        pointer: function (x, y, inside) { post({ type: 'pointer', id: id, x: x, y: y, inside: inside }); }
+        pointer: function (x, y, inside) { post({ type: 'pointer', id: id, x: x, y: y, inside: inside }); },
+        pause: function (v) { post({ type: 'pause', id: id, v: v }); }
       };
     } else api = mainThread(canvas, opts, r);
     canvas.__contours = api;
@@ -288,6 +291,15 @@
     }).observe(canvas);
     if ('IntersectionObserver' in window) new IntersectionObserver(function (es) { api.show(es[0].isIntersecting); }, { rootMargin: '0px 0px -8% 0px' }).observe(canvas);
     else api.show(true);
+    if (live) {
+      // While the page is scrolling the drift is invisible anyway: hold it, and give the frame to the scroll.
+      var scrolling = false, stopTimer = 0;
+      window.addEventListener('scroll', function () {
+        if (!scrolling) { scrolling = true; api.pause(true); }
+        clearTimeout(stopTimer);
+        stopTimer = setTimeout(function () { scrolling = false; api.pause(false); }, 180);
+      }, { passive: true });
+    }
     if (live && finePointer) {
       var pending = null;
       window.addEventListener('pointermove', function (e) {
@@ -317,7 +329,8 @@
     return {
       resize: function (w, h) { f.resize(w, h); },
       show: function (v) { f.show(v, performance.now()); if (v) kick(); },
-      pointer: function (x, y, inside) { f.pointer(x, y, inside); }
+      pointer: function (x, y, inside) { f.pointer(x, y, inside); },
+      pause: function (v) { f.paused = v; if (!v) kick(); }
     };
   }
 
