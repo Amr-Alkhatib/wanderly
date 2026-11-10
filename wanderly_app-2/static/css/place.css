@@ -91,7 +91,7 @@
 .cp-tab.active{color:#fff}
 .cp-tab-bar:not(.has-ink) .cp-tab.active{background:var(--atlantic)}
 .seg-ink{position:absolute;left:0;top:0;z-index:0;pointer-events:none;border-radius:var(--r-pill);background:var(--atlantic);opacity:0}
-.cp-tab-panel{display:none}
+.cp-tab-panel{display:none;scroll-margin-top:calc(var(--nav-top) + var(--nav-h) + 84px)} /* a #tab-… link lands below the nav and the stuck tab bar */
 .cp-tab-panel.active{display:block}
 .cp-panel-inner{padding-top:28px}
 

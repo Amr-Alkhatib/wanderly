@@ -125,12 +125,12 @@ class SaveAndPlanTests(TestCase):
         self.assertNotContains(resp, 'href="#" class="cp-cta-btn')
         self.assertContains(resp, "js/wanderly/saves.js")
 
-    def test_plan_a_trip_opens_this_citys_itinerary(self):
+    def test_plan_a_trip_goes_to_this_citys_overview(self):
         resp = self.client.get(self.page)
         self.assertContains(resp, "Plan a trip to Lisbon")
-        self.assertContains(resp, 'href="?itinerary=1&amp;days=3#tab-itinerary" class="cp-cta-btn" data-plan-trip')
+        self.assertContains(resp, 'href="#tab-overview" class="cp-cta-btn" data-plan-trip')
 
-    def test_country_plan_a_trip_opens_its_lead_citys_itinerary(self):
+    def test_country_plan_a_trip_goes_to_its_lead_citys_overview(self):
         resp = self.client.get(reverse("country_profile", args=[self.country.slug]))
-        self.assertContains(resp, f'href="{self.page}?itinerary=1&amp;days=3#tab-itinerary"')
+        self.assertContains(resp, f'href="{self.page}#tab-overview"')
         self.assertContains(resp, "Plan a trip to Lisbon")
