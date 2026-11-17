@@ -78,6 +78,7 @@ environment (sensible local defaults are provided):
 | `DJANGO_DB_ENGINE` | `sqlite3` | Set `postgresql` to use Postgres. |
 | `DJANGO_DB_*` | — | Name/User/Password/Host/Port for Postgres. |
 | `WANDERLY_EXPLAINER_BACKEND` | `intelligence.explainers.NullExplainer` | Dotted path to the explainer. Swap to a Gemini/Groq subclass to enable LLM prose — a config change, not an architecture change. |
+| `WANDERLY_CONTACT_EMAIL` | — | Contact address shown on `/privacy/` for data protection requests. **Required in production** (`check --deploy` fails without it). |
 
 ---
 

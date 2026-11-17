@@ -93,6 +93,7 @@
     {% if user.is_authenticated %}
       <li><a href="{% url 'account' %}">Account</a></li>
     {% endif %}
+    <li><a href="{% url 'privacy' %}">Privacy</a></li>
   </ul>
   <div class="nav-sheet-foot">
     {% if user.is_authenticated %}
@@ -124,6 +125,7 @@
         {% else %}
           <a href="{% url 'login' %}">Log in</a>
         {% endif %}
+        <a href="{% url 'privacy' %}">Privacy</a>
       </nav>
     </div>
     <div class="footer-word" aria-hidden="true">wanderly</div>

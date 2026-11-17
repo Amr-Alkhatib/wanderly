@@ -15,4 +15,5 @@ urlpatterns = [
     path("destination/<slug:slug>/itinerary/", views.itinerary_fragment, name="itinerary_fragment"),
     path("compare/", views.compare, name="compare"),
     path("saved/", saved, name="saved"),
+    path("privacy/", views.privacy, name="privacy"),
 ]

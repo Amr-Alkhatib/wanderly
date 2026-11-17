@@ -419,3 +419,12 @@ def compare(request: HttpRequest) -> HttpResponse:
         "open_slots": range(max(0, 3 - len(slugs))),
     }
     return render(request, "core/compare.html", context)
+
+
+def privacy(request: HttpRequest) -> HttpResponse:
+    """Privacy policy: what Wanderly stores, where, and for how long."""
+    from django.conf import settings
+
+    return render(request, "core/privacy.html", {
+        "contact_email": settings.WANDERLY_CONTACT_EMAIL,
+    })

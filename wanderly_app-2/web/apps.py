@@ -7,3 +7,6 @@ class WebConfig(AppConfig):
     default_auto_field = "django.db.models.BigAutoField"
     name = "web"
     verbose_name = "Web (presentation)"
+
+    def ready(self) -> None:
+        from . import checks  # noqa: F401  (registers the system checks)
