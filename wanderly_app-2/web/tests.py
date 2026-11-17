@@ -134,3 +134,31 @@ class SaveAndPlanTests(TestCase):
         resp = self.client.get(reverse("country_profile", args=[self.country.slug]))
         self.assertContains(resp, f'href="{self.page}#tab-overview"')
         self.assertContains(resp, "Plan a trip to Lisbon")
+
+
+@override_settings(STORAGES={
+    "default": {"BACKEND": "django.core.files.storage.FileSystemStorage"},
+    "staticfiles": {"BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage"},
+})
+class PrivacyPageTests(TestCase):
+    @override_settings(WANDERLY_CONTACT_EMAIL="privacy@example.org")
+    def test_privacy_page_names_the_contact_and_every_cookie(self):
+        r = self.client.get(reverse("privacy"))
+        self.assertEqual(r.status_code, 200)
+        self.assertContains(r, 'href="mailto:privacy@example.org"')
+        for name in ("csrftoken", "sessionid", "w:pt", "w:low"):
+            self.assertContains(r, f"<code>{name}</code>")
+        self.assertNotContains(r, "legal-missing")
+
+    @override_settings(WANDERLY_CONTACT_EMAIL="")
+    def test_missing_contact_is_visible_and_fails_the_deploy_check(self):
+        from web.checks import privacy_contact_configured
+
+        r = self.client.get(reverse("privacy"))
+        self.assertContains(r, "legal-missing")
+        self.assertEqual([e.id for e in privacy_contact_configured(None)], ["web.E001"])
+
+    def test_every_page_links_to_the_privacy_policy(self):
+        for name in ("home", "login", "signup"):
+            r = self.client.get(reverse(name))
+            self.assertContains(r, f'href="{reverse("privacy")}"', msg_prefix=name)

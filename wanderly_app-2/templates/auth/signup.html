@@ -140,13 +140,10 @@
         {% endfor %}
       </div>
 
-      <div class="auth-checkbox-row">
-        <input type="checkbox" id="agreeTerms" name="agree_terms" required />
-        <label for="agreeTerms">
-          I agree to the <a href="#">Terms of Service</a>
-          and <a href="#">Privacy Policy</a>
-        </label>
-      </div>
+      <p class="auth-legal-note">
+        We use your email address and name only to run your account.
+        The <a href="{% url 'privacy' %}">privacy policy</a> explains what is stored and how to delete it.
+      </p>
 
       <button type="submit" class="auth-btn" id="signupBtn">
         <span class="spinner"></span>
@@ -217,13 +214,6 @@ function checkMatch() {
 }
 
 document.getElementById('signupForm').addEventListener('submit', function(e) {
-  const agree = document.getElementById('agreeTerms');
-  if (!agree.checked) {
-    e.preventDefault();
-    agree.setCustomValidity('You must agree to the terms.');
-    agree.reportValidity();
-    return;
-  }
   // Client-side match guard (server also validates)
   const p1 = document.getElementById(PW1_ID).value;
   const p2 = document.getElementById(PW2_ID).value;

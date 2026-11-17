@@ -233,6 +233,16 @@ WANDERLY_EXPLAINER_BACKEND = os.environ.get(
 )
 
 
+# --- Privacy policy contact ----------------------------------------------------
+#
+# The address shown on /privacy/ for data protection requests. Set it in the
+# environment (or the .env file next to manage.py), e.g.
+#   WANDERLY_CONTACT_EMAIL=you@example.org
+# `manage.py check --deploy` reports an error while it is missing.
+
+WANDERLY_CONTACT_EMAIL = os.environ.get("WANDERLY_CONTACT_EMAIL", "").strip()
+
+
 # --- Supabase integration ----------------------------------------------------
 #
 # SUPABASE_URL and SUPABASE_ANON_KEY are safe to expose to the frontend.
