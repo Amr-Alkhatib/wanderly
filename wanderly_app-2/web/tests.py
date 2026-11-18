@@ -162,3 +162,16 @@ class PrivacyPageTests(TestCase):
         for name in ("home", "login", "signup"):
             r = self.client.get(reverse(name))
             self.assertContains(r, f'href="{reverse("privacy")}"', msg_prefix=name)
+
+
+@override_settings(STORAGES={
+    "default": {"BACKEND": "django.core.files.storage.FileSystemStorage"},
+    "staticfiles": {"BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage"},
+})
+class NotFoundPageTests(TestCase):
+    def test_unknown_url_shows_the_wanderly_404_page(self):
+        r = self.client.get("/this-place-does-not-exist/")
+        self.assertEqual(r.status_code, 404)
+        self.assertTemplateUsed(r, "404.html")
+        self.assertContains(r, "This place isn't on our map", status_code=404)
+        self.assertContains(r, f'action="{reverse("search")}"', status_code=404)

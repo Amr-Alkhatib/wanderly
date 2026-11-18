@@ -65,6 +65,13 @@ python manage.py test
 
 ---
 
+## Privacy and error pages
+
+- `/privacy/` lists what Wanderly stores (Django's `csrftoken` and `sessionid` cookies, two session-storage flags, Supabase sign-in, preferences and saved trips) and how to get it deleted. Set `WANDERLY_CONTACT_EMAIL` so it shows a contact address.
+- `templates/404.html` is the "off the map" page for unknown URLs. Django only uses it with `DJANGO_DEBUG=0`.
+
+---
+
 ## Configuration
 
 Security-sensitive and environment-specific values are read from the

@@ -15,6 +15,7 @@ TUM Project Work (IN8028) · Python · Django · PostgreSQL / SQLite · Supabase
 - **Freshness warnings.** Every volatile fact (prices, weather, safety advisories) stores its source and capture date. Data older than its freshness window is flagged with ⚠ in the UI instead of being shown as current.
 - **Compare, save, plan.** Side-by-side city comparison, country and destination profiles, saved trips (Supabase Auth) and an AI day-by-day itinerary.
 - **AI itinerary that never blocks the page.** The page loads instantly and fetches the itinerary separately. Gemini returns schema-validated JSON in about 2 seconds, with a time-capped fallback model and a 24-hour cache.
+- **Privacy by default.** No analytics, ads or third-party requests from the browser; only the two cookies Django needs. The policy at `/privacy/` lists everything that is stored. Unknown URLs get a custom "off the map" 404 page.
 
 ---
 
@@ -81,7 +82,7 @@ python manage.py runserver
 
 Visit http://127.0.0.1:8000/.
 
-Run the tests (27 tests covering the engine, the comparison logic, the itinerary and the destination page):
+Run the tests (35 tests covering the engine, the comparison logic, the itinerary, the destination page, the privacy page and the 404 page):
 
 ```bash
 python manage.py test
@@ -105,6 +106,9 @@ Security-sensitive and environment-specific values are read from the environment
 | `GEMINI_API_KEY` | — | Needed for the AI itinerary. Never commit it. |
 | `GEMINI_MODEL` | `gemini-3.5-flash-lite` | Primary itinerary model. Change it here when Google retires a model. |
 | `WANDERLY_EXPLAINER_BACKEND` | `intelligence.explainers.NullExplainer` | Dotted path to the explainer. Swap in a Gemini/Groq subclass to enable LLM prose. It's a config change, not an architecture change. |
+| `WANDERLY_CONTACT_EMAIL` | — | Contact address on `/privacy/` for data protection requests. **Required in production**: `manage.py check --deploy` fails without it. |
+
+The custom 404 page (`templates/404.html`) is only used when `DJANGO_DEBUG=0`; with debug on, Django shows its own technical page.
 
 ---
 
